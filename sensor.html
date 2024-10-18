@@ -5,25 +5,36 @@
 </head>
 <body>
     <button id="requestPermission">Enable Motion Detection</button>
+    <p id="status">Motion detection is not yet enabled.</p>
 
     <script>
         document.getElementById('requestPermission').addEventListener('click', () => {
+            const statusElement = document.getElementById('status');
+
             if (typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission()
                     .then(response => {
                         if (response === 'granted') {
+                            statusElement.textContent = 'Motion detection enabled!';
                             window.addEventListener('devicemotion', (event) => {
                                 console.log('Acceleration:', event.acceleration);
+                                statusElement.textContent = `Acceleration: X: ${event.acceleration.x}, Y: ${event.acceleration.y}, Z: ${event.acceleration.z}`;
                             });
                         } else {
-                            alert('Permission denied');
+                            statusElement.textContent = 'Permission denied. Motion detection cannot be enabled.';
+                            alert('You must grant permission to use motion detection.');
                         }
                     })
-                    .catch(console.error);
+                    .catch(error => {
+                        statusElement.textContent = 'Error while requesting permission.';
+                        console.error('Permission request error:', error);
+                    });
             } else {
-                // Non-iOS 13+ device
+                // For devices that do not require permission (e.g., Android)
+                statusElement.textContent = 'Motion detection enabled!';
                 window.addEventListener('devicemotion', (event) => {
                     console.log('Acceleration:', event.acceleration);
+                    statusElement.textContent = `Acceleration: X: ${event.acceleration.x}, Y: ${event.acceleration.y}, Z: ${event.acceleration.z}`;
                 });
             }
         });
