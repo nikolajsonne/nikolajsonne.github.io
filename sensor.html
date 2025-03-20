@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Device Motion Square</title>
+    <style>
+        /* Container with a visible border */
+        #container {
+            width: 200px;
+            height: 200px;
+            border: 2px solid #000;
+            position: relative;
+            margin: 0 auto;
+            margin-top: 50px; /* Center the container vertically */
+        }
+
+        /* The square that moves */
+        #square {
+            width: 20px;
+            height: 20px;
+            background-color: red;
+            position: absolute;
+            top: 90px; /* Start near the center */
+            left: 90px; /* Start near the center */
+        }
+
+        /* Center the content */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <h1>Device Motion Example</h1>
+    <button id="requestPermission">Enable Motion Detection</button>
+    <p id="status">Motion detection is not yet enabled.</p>
+    <div id="container">
+        <div id="square"></div>
+    </div>
+
+    <script>
+        const square = document.getElementById('square');
+        const statusElement = document.getElementById('status');
+        let posX = 90; // Initial X position
+        let posY = 90; // Initial Y position
+        const containerSize = 200;
+        const squareSize = 20;
+
+        document.getElementById('requestPermission').addEventListener('click', () => {
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                DeviceMotionEvent.requestPermission()
+                    .then(response => {
+                        if (response === 'granted') {
+                            statusElement.textContent = 'Motion detection enabled!';
+                            window.addEventListener('devicemotion', handleMotion);
+                        } else {
+                            statusElement.textContent = 'Permission denied. Motion detection cannot be enabled.';
+                            alert('You must grant permission to use motion detection.');
+                        }
+                    })
+                    .catch(error => {
+                        statusElement.textContent = 'Error while requesting permission.';
+                        console.error('Permission request error:', error);
+                    });
+            } else {
+                // For devices that do not require permission (e.g., Android)
+                statusElement.textContent = 'Motion detection enabled!';
+                window.addEventListener('devicemotion', handleMotion);
+            }
+        });
+
+        function handleMotion(event) {
+            const accelerationX = event.accelerationIncludingGravity.x;
+            const accelerationY = event.accelerationIncludingGravity.y;
+
+            // Adjust positions based on acceleration values
+            posX += accelerationX;
+            posY += accelerationY;
+
+            // Constrain the square within the 200x200 container
+            posX = Math.max(0, Math.min(containerSize - squareSize, posX));
+            posY = Math.max(0, Math.min(containerSize - squareSize, posY));
+
+            // Update the square's position
+            square.style.left = posX + 'px';
+            square.style.top = posY + 'px';
+        }
+    </script>
+</body>
+</html>

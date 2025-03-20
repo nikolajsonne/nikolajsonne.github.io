@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gyroscope and Accelerometer Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        .data {
+            margin: 10px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gyroscope and Accelerometer Data</h1>
+    <button id="requestPermission">Request Permission</button>
+    <div class="data">
+        <p>Acceleration X: <span id="accelX">0</span></p>
+        <p>Acceleration Y: <span id="accelY">0</span></p>
+        <p>Acceleration Z: <span id="accelZ">0</span></p>
+        <p>Rotation Alpha: <span id="rotationAlpha">0</span></p>
+        <p>Rotation Beta: <span id="rotationBeta">0</span></p>
+        <p>Rotation Gamma: <span id="rotationGamma">0</span></p>
+    </div>
+
+    <script>
+        const accelX = document.getElementById('accelX');
+        const accelY = document.getElementById('accelY');
+        const accelZ = document.getElementById('accelZ');
+        const rotationAlpha = document.getElementById('rotationAlpha');
+        const rotationBeta = document.getElementById('rotationBeta');
+        const rotationGamma = document.getElementById('rotationGamma');
+
+        function updateMotion(event) {
+            const acc = event.accelerationIncludingGravity;
+            accelX.textContent = acc.x.toFixed(2);
+            accelY.textContent = acc.y.toFixed(2);
+            accelZ.textContent = acc.z.toFixed(2);
+        }
+
+        function updateOrientation(event) {
+            rotationAlpha.textContent = event.alpha.toFixed(2);
+            rotationBeta.textContent = event.beta.toFixed(2);
+            rotationGamma.textContent = event.gamma.toFixed(2);
+        }
+
+        document.getElementById('requestPermission').addEventListener('click', async () => {
+            if (DeviceMotionEvent.requestPermission) {
+                const response = await DeviceMotionEvent.requestPermission();
+                if (response === 'granted') {
+                    window.addEventListener('devicemotion', updateMotion);
+                    window.addEventListener('deviceorientation', updateOrientation);
+                } else {
+                    alert('Permission denied');
+                }
+            } else {
+                window.addEventListener('devicemotion', updateMotion);
+                window.addEventListener('deviceorientation', updateOrientation);
+            }
+        });
+    </script>
+</body>
+</html>
