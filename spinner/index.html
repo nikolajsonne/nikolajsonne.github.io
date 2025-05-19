@@ -1,1 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amiga Demo Spinner - Visible Stars</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000; /* Black background for the page, starfield will cover */
+            display: flex; /* Used to center #amigaWindow and #info */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            font-family: 'Press Start 2P', cursive;
+            color: #0f0; /* Green text, classic demo style */
+            overflow: hidden; /* Hide scrollbars */
+        }
+
+        #starfieldCanvas {
+            position: fixed; /* Fill the entire viewport */
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0; /* Behind everything else */
+        }
+
+        #info {
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 12px;
+            line-height: 1.6;
+            position: relative; /* To ensure it's above the fixed starfield */
+            z-index: 10;
+        }
+
+        #solidNameInfo {
+            color: #ff0; /* Yellow for solid name, to stand out */
+        }
+
+        #amigaWindow {
+            width: 500px;
+            height: 500px;
+            border: 3px solid #555; /* Border for the window */
+            /* background-color: #000; No need, objectCanvas is transparent over starfield */
+            position: relative; /* To ensure it's above the fixed starfield and for positioning objectCanvas */
+            z-index: 10; /* Above starfield */
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5); /* Green glow */
+            overflow: hidden; /* Ensure content stays within bounds */
+        }
+
+        /* objectCanvas is inside amigaWindow, so its z-index is relative to amigaWindow */
+        #objectCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="starfieldCanvas"></canvas>
+
+    <div id="info">
+        <p>AMIGA DEMO SPINNER</p>
+        <p>UP/DOWN Arrows: Change Solid</p>
+        <p id="solidNameInfo">Current Solid: Tetrahedron</p>
+        <p>LEFT/RIGHT Arrows: Change Star Speed</p>
+    </div>
+
+    <div id="amigaWindow">
+        <canvas id="objectCanvas"></canvas>
+    </div>
+
+    <script>
+        // --- Starfield Configuration ---
+        const starfieldCanvas = document.getElementById('starfieldCanvas');
+        const starfieldCtx = starfieldCanvas.getContext('2d');
+        const numStars = 300; // Adjusted slightly, can be tweaked
+        let stars = [];
+        let starSpeedFactor = 1.0; 
+        let starfieldCenterX = window.innerWidth / 2;
+        let starfieldCenterY = window.innerHeight / 2;
+
+        // --- 3D Object Configuration (Three.js) ---
+        const objectCanvas = document.getElementById('objectCanvas'); // This is the 500x500 canvas
+        let scene, camera, renderer, spinningObject;
+        
+        const platonicSolids = [
+            { name: "Tetrahedron",   geometry: () => new THREE.TetrahedronGeometry(1.9, 0) },
+            { name: "Cube",          geometry: () => new THREE.BoxGeometry(2.6, 2.6, 2.6) },
+            { name: "Octahedron",    geometry: () => new THREE.OctahedronGeometry(2.0, 0) },
+            { name: "Dodecahedron",  geometry: () => new THREE.DodecahedronGeometry(1.8, 0) },
+            { name: "Icosahedron",   geometry: () => new THREE.IcosahedronGeometry(1.9, 0) }
+        ];
+        let currentSolidIndex = 0;
+        const solidNameInfoElement = document.getElementById('solidNameInfo');
+
+        // --- Initialize Starfield ---
+        function initStarfield() {
+            starfieldCanvas.width = window.innerWidth;
+            starfieldCanvas.height = window.innerHeight;
+            starfieldCenterX = window.innerWidth / 2;
+            starfieldCenterY = window.innerHeight / 2;
+            stars = []; 
+            for (let i = 0; i < numStars; i++) {
+                stars.push(createStar());
+            }
+        }
+
+        function createStar() {
+            const angle = Math.random() * Math.PI * 2;
+            const initialDistFactor = Math.random() * 0.1 + 0.01; 
+            const dist = Math.min(starfieldCenterX, starfieldCenterY) * initialDistFactor;
+            return {
+                x: starfieldCenterX + Math.cos(angle) * dist,
+                y: starfieldCenterY + Math.sin(angle) * dist,
+                dist: dist, 
+                angle: angle, 
+                // Increased base star sizes
+                size: Math.random() * 0.8 + 0.5, // Base size 0.5 to 1.3 pixels
+                speed: Math.random() * 0.8 + 0.2  
+            };
+        }
+
+        // --- Draw Starfield ---
+        function drawStarfield() {
+            starfieldCtx.fillStyle = '#000'; 
+            starfieldCtx.fillRect(0, 0, starfieldCanvas.width, starfieldCanvas.height);
+            starfieldCtx.fillStyle = '#FFF'; 
+
+            for (let i = 0; i < stars.length; i++) {
+                const star = stars[i];
+                
+                star.dist += star.speed * starSpeedFactor;
+                star.x = starfieldCenterX + Math.cos(star.angle) * star.dist;
+                star.y = starfieldCenterY + Math.sin(star.angle) * star.dist;
+
+                // Adjust size calculation for new base sizes and max size
+                const growthFactor = 1 + (star.dist / Math.min(starfieldCenterX, starfieldCenterY)) * 1.2; // Adjusted growth rate
+                const currentSize = Math.min(star.size * growthFactor, 2.5); // Max size of 2.5px
+
+                starfieldCtx.beginPath();
+                // Ensure minimum drawn size is reasonable, e.g., 0.5px, to avoid them being too faint even if calculated small
+                starfieldCtx.arc(star.x, star.y, Math.max(0.3, currentSize), 0, Math.PI * 2); 
+                starfieldCtx.fill();
+
+                // Reset condition if star goes off screen or too far
+                if (star.x < -currentSize || star.x > starfieldCanvas.width + currentSize || 
+                    star.y < -currentSize || star.y > starfieldCanvas.height + currentSize ||
+                    star.dist > Math.max(starfieldCenterX, starfieldCenterY) * 1.05) { 
+                    Object.assign(star, createStar()); 
+                }
+            }
+        }
+
+        // --- Initialize 3D Object ---
+        function init3DObject() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, 500 / 500, 0.1, 1000); // Aspect ratio for 500x500 canvas
+            camera.position.z = 4.5; 
+
+            renderer = new THREE.WebGLRenderer({ canvas: objectCanvas, alpha: true });
+            renderer.setSize(500, 500); // Renderer size fixed to the object canvas
+            renderer.setClearColor(0x000000, 0); // Transparent background for the 3D object canvas
+
+            updateObjectGeometry(); 
+
+            if (!scene.getObjectByName("ambientLight")) {
+                const ambientLight = new THREE.AmbientLight(0xcccccc, 1.2); // Slightly brighter ambient for wireframe
+                ambientLight.name = "ambientLight";
+                scene.add(ambientLight);
+            }
+        }
+
+        // --- Update/Create Object Geometry ---
+        function updateObjectGeometry() {
+            if (spinningObject) {
+                scene.remove(spinningObject);
+                if (spinningObject.geometry) spinningObject.geometry.dispose();
+                if (spinningObject.material) spinningObject.material.dispose();
+            }
+
+            const solidData = platonicSolids[currentSolidIndex];
+            const geometry = solidData.geometry(); 
+            
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x00ff00, // Bright green wireframe
+                wireframe: true
+            });
+            
+            spinningObject = new THREE.Mesh(geometry, material);
+            scene.add(spinningObject);
+
+            solidNameInfoElement.textContent = `Current Solid: ${solidData.name}`;
+        }
+
+        // --- Animation Loop ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            drawStarfield(); // Draw fullscreen starfield
+
+            if (spinningObject) {
+                spinningObject.rotation.x += 0.008; 
+                spinningObject.rotation.y += 0.012;
+            }
+            renderer.render(scene, camera); // Render 3D object on its own canvas
+        }
+
+        // --- Event Listeners for Controls ---
+        document.addEventListener('keydown', (event) => {
+            let needsSolidUpdate = false;
+            switch (event.key) {
+                case 'ArrowUp':
+                    currentSolidIndex = (currentSolidIndex + 1) % platonicSolids.length;
+                    needsSolidUpdate = true;
+                    break;
+                case 'ArrowDown':
+                    currentSolidIndex = (currentSolidIndex - 1 + platonicSolids.length) % platonicSolids.length;
+                    needsSolidUpdate = true;
+                    break;
+                case 'ArrowRight':
+                    starSpeedFactor = Math.min(5.0, starSpeedFactor + 0.2);
+                    break;
+                case 'ArrowLeft':
+                    starSpeedFactor = Math.max(0.05, starSpeedFactor - 0.2); 
+                    break;
+            }
+            if (needsSolidUpdate) {
+                updateObjectGeometry();
+            }
+        });
+        
+        // --- Initial Setup on Load ---
+        window.onload = function() {
+            initStarfield(); 
+            init3DObject();  
+            animate();
+        };
+
+        // --- Handle Window Resize for Starfield ---
+        window.addEventListener('resize', () => {
+            initStarfield(); // Re-initialize starfield to fit new window size
+            // 3D object canvas and renderer remain fixed at 500x500
+        });
+
+    </script>
+</body>
+</html>
 
