@@ -1,1 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P5.js Kaleidoscope</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <style>
+        /* Basic CSS to ensure full-screen canvas and no scrollbars */
+        body {
+            margin: 0;
+            overflow: hidden; /* Prevents scrollbars if canvas is slightly larger */
+            background-color: #000; /* Sets a black background for the page */
+            font-family: 'Inter', sans-serif; /* Consistent font */
+        }
+        canvas {
+            display: block; /* Removes any default spacing below the canvas */
+        }
+        /* Simple instruction overlay */
+        .instructions {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 16px;
+            padding: 8px 15px;
+            background-color: rgba(0,0,0,0.5);
+            border-radius: 8px;
+            pointer-events: none; /* So it doesn't interfere with mouse drawing */
+        }
+    </style>
+</head>
+<body>
+    <div class="instructions">Click and drag to draw</div>
+    <script>
+        // Number of symmetrical segments in the kaleidoscope
+        let symmetry = 6;
+        // Angle for each segment (calculated in setup)
+        let angle;
+        // Current hue value for color cycling
+        let hu = 0;
+        // Thickness of the drawing stroke
+        let brushSize = 4;
+
+        // p5.js setup function: runs once when the program starts
+        function setup() {
+            // Create a canvas that fills the browser window
+            createCanvas(windowWidth, windowHeight);
+            // Set angle mode to DEGREES for easier calculations (0-360)
+            angleMode(DEGREES);
+            // Set the initial background color to black
+            // This is only drawn once in setup, so drawings persist
+            background(0);
+            // Set color mode to HSB (Hue, Saturation, Brightness, Alpha)
+            // Max values: Hue 360, Sat 100, Bri 100, Alpha 100
+            colorMode(HSB, 360, 100, 100, 100);
+            // Calculate the angle for each symmetry segment
+            angle = 360 / symmetry;
+        }
+
+        // p5.js draw function: runs continuously in a loop
+        function draw() {
+            // Translate the origin to the center of the canvas
+            // This makes all drawing operations relative to the center
+            translate(width / 2, height / 2);
+
+            // Only draw if the mouse button is pressed
+            if (mouseIsPressed) {
+                // Calculate current mouse position relative to the translated center
+                let mx = mouseX - width / 2;
+                let my = mouseY - height / 2;
+                // Calculate previous mouse position relative to the translated center
+                let pmx = pmouseX - width / 2;
+                let pmy = pmouseY - height / 2;
+
+                // Loop through each symmetry segment
+                for (let i = 0; i < symmetry; i++) {
+                    // Rotate the canvas by the segment angle
+                    // Each rotation adds to the previous ones
+                    rotate(angle);
+
+                    // Set the stroke properties
+                    strokeWeight(brushSize);
+                    // Set stroke color: cycling hue, fixed saturation & brightness, semi-transparent
+                    stroke(hu, 80, 90, 50); // 50 alpha for nice blending
+
+                    // Draw the primary line based on mouse movement
+                    line(mx, my, pmx, pmy);
+
+                    // Create a reflection within the current segment
+                    push(); // Save current transformation state
+                    scale(1, -1); // Reflect vertically (across the x-axis of the rotated segment)
+                    line(mx, my, pmx, pmy); // Draw the reflected line
+                    pop();  // Restore previous transformation state
+                }
+
+                // Increment the hue value for the next frame, creating a color cycling effect
+                hu = (hu + 0.5) % 360; // Increment hue and wrap around at 360
+            }
+        }
+
+        // p5.js function: called automatically when the browser window is resized
+        function windowResized() {
+            // Resize the canvas to the new window dimensions
+            resizeCanvas(windowWidth, windowHeight);
+            // Redraw the background to clear the canvas, effectively resetting the drawing
+            background(0);
+        }
+    </script>
+</body>
+</html>
 
