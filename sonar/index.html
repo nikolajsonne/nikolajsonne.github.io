@@ -1,1 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Continuous Clicker</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            background-color: #f0f4f8;
+            color: #333;
+            margin: 0;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+        h1 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 18px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            transition: background-color 0.3s ease, transform 0.1s ease;
+            min-width: 150px; /* Ensure buttons have a decent width */
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        #toggleClicker.on {
+            background-color: #e74c3c; /* Red for "ON" state, implying "Stop" action */
+            color: white;
+        }
+        #toggleClicker.off {
+            background-color: #2ecc71; /* Green for "OFF" state, implying "Start" action */
+            color: white;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 1.1em;
+            color: #555;
+            min-height: 1.5em; /* Reserve space to prevent layout shift */
+        }
+        .info {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Continuous Clicker</h1>
+        <button id="toggleClicker" class="off">Start Clicking</button>
+        <p id="status">Status: Idle</p>
+        <p class="info">Click the button to start or stop a click sound every 500ms.</p>
+    </div>
+
+    <script>
+        const toggleButton = document.getElementById('toggleClicker');
+        const statusDisplay = document.getElementById('status');
+
+        let audioContext;
+        let clickIntervalId = null; // To store the ID of the interval
+        let isClicking = false; // State to track if clicking is active
+        const CLICK_INTERVAL_MS = 500;
+
+        // Function to initialize or resume AudioContext
+        function initAudioContext() {
+            if (!audioContext || audioContext.state === 'closed') {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        // Function to play a single click sound
+        function playClick() {
+            if (!audioContext || audioContext.state !== 'running') {
+                console.warn("AudioContext not running. Cannot play click.");
+                // Attempt to re-initialize if it's not running (e.g., after page was idle)
+                initAudioContext();
+                if (!audioContext || audioContext.state !== 'running') return;
+            }
+
+            // Create a short, sharp click sound
+            // Buffer duration: 0.01 seconds (10ms)
+            const bufferDuration = 0.01;
+            const clickBuffer = audioContext.createBuffer(1, audioContext.sampleRate * bufferDuration, audioContext.sampleRate);
+            const channelData = clickBuffer.getChannelData(0);
+
+            // Simple impulse-like sound
+            // A few sharp samples for a "tick" or "click" sound
+            channelData[0] = 0.8; // Start with a strong positive peak
+            channelData[1] = -0.6; // Followed by a negative peak to make it sharper
+            channelData[2] = 0.4;
+            channelData[3] = -0.2;
+            // Rest of the buffer is silence
+            for (let i = 4; i < channelData.length; i++) {
+                channelData[i] = 0;
+            }
+
+            const source = audioContext.createBufferSource();
+            source.buffer = clickBuffer;
+
+            // Optional: Add a gain node for volume control, though for a simple click it might be overkill
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // Adjust volume (0.0 to 1.0)
+
+            source.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            source.start();
+
+            // Clean up the source node after it has finished playing
+            source.onended = () => {
+                source.disconnect();
+                gainNode.disconnect();
+            };
+        }
+
+        toggleButton.addEventListener('click', () => {
+            // Initialize AudioContext on the first user interaction
+            initAudioContext();
+
+            if (isClicking) {
+                // If currently clicking, stop it
+                if (clickIntervalId) {
+                    clearInterval(clickIntervalId);
+                    clickIntervalId = null;
+                }
+                isClicking = false;
+                toggleButton.textContent = 'Start Clicking';
+                toggleButton.classList.remove('on');
+                toggleButton.classList.add('off');
+                statusDisplay.textContent = 'Status: Stopped';
+                console.log("Clicking stopped.");
+            } else {
+                // If not clicking, start it
+                playClick(); // Play the first click immediately
+                clickIntervalId = setInterval(playClick, CLICK_INTERVAL_MS);
+                isClicking = true;
+                toggleButton.textContent = 'Stop Clicking';
+                toggleButton.classList.remove('off');
+                toggleButton.classList.add('on');
+                statusDisplay.textContent = `Status: Clicking every ${CLICK_INTERVAL_MS}ms`;
+                console.log("Clicking started.");
+            }
+        });
+
+        // Optional: Clean up if the window is closed or navigated away
+        window.addEventListener('beforeunload', () => {
+            if (clickIntervalId) {
+                clearInterval(clickIntervalId);
+            }
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close().catch(e => console.warn("Error closing audio context:", e));
+            }
+        });
+
+    </script>
+</body>
+</html>
 
