@@ -157,10 +157,12 @@
             <span id="echoThresholdValue">0.05</span>
 
             <label for="refractoryPeriod">Refractory (ms):</label>
-            <input type="number" id="refractoryPeriod" value="50" min="10" max="500" style="width: 70px;">
-            <span></span> <label for="echoTimeout">Max Echo Wait (ms):</label>
+            <input type="number" id="refractoryPeriod" value="50" min="1" max="500" style="width: 70px;"> {/* Changed min to 1 */}
+            <span></span> 
+            <label for="echoTimeout">Max Echo Wait (ms):</label>
             <input type="number" id="echoTimeout" value="1000" min="100" max="3000" style="width: 70px;">
-            <span></span> </div>
+            <span></span> 
+        </div>
     </div>
 
     <script>
@@ -532,3 +534,9 @@
     </script>
 </body>
 </html>
+```
+The specific change is in this line within the HTML structure:
+```html
+<input type="number" id="refractoryPeriod" value="50" min="1" max="500" style="width: 70px;">
+```
+The `min` attribute for `refractoryPeriod` is now set to `
