@@ -3,179 +3,532 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Continuous Clicker</title>
+    <title>Sound Distance Measurement with Auto-Clicker</title>
     <style>
         body {
             font-family: 'Inter', sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
             padding: 20px;
-            background-color: #f0f4f8;
+            background-color: #f0f4f8; /* Light grayish blue */
             color: #333;
             margin: 0;
         }
         .container {
             background-color: #ffffff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-            text-align: center;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 12px; /* Softer corners */
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1); /* Slightly more pronounced shadow */
             width: 90%;
-            max-width: 400px;
+            max-width: 600px;
+        }
+        h1, h2 {
+            color: #2c3e50; /* Dark blue-gray */
+            margin-top: 0;
+            text-align: center;
         }
         h1 {
-            margin-top: 0;
-            color: #2c3e50;
             font-size: 1.8em;
             margin-bottom: 20px;
         }
+        h2 {
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
         button {
-            padding: 12px 25px;
-            font-size: 18px;
+            padding: 10px 18px;
+            font-size: 16px;
             cursor: pointer;
             border: none;
-            border-radius: 8px;
-            transition: background-color 0.3s ease, transform 0.1s ease;
-            min-width: 150px; /* Ensure buttons have a decent width */
+            border-radius: 8px; /* Consistent rounded corners */
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            margin: 5px;
+            color: white;
         }
         button:active {
-            transform: scale(0.98);
+            transform: scale(0.97);
         }
-        #toggleClicker.on {
-            background-color: #e74c3c; /* Red for "ON" state, implying "Stop" action */
-            color: white;
+        button:disabled {
+            background-color: #bdc3c7; /* Muted gray for disabled */
+            cursor: not-allowed;
         }
-        #toggleClicker.off {
-            background-color: #2ecc71; /* Green for "OFF" state, implying "Start" action */
-            color: white;
+        #startMeasurement {
+            background-color: #3498db; /* Bright blue */
         }
-        #status {
-            margin-top: 20px;
-            font-size: 1.1em;
-            color: #555;
-            min-height: 1.5em; /* Reserve space to prevent layout shift */
+        #startMeasurement:hover:not(:disabled) {
+            background-color: #2980b9;
         }
-        .info {
-            font-size: 0.9em;
-            color: #7f8c8d;
-            margin-top: 30px;
+        #toggleAutoClick.on {
+            background-color: #e74c3c; /* Red for "Stop" action */
+        }
+        #toggleAutoClick.on:hover {
+            background-color: #c0392b;
+        }
+        #toggleAutoClick.off {
+            background-color: #2ecc71; /* Green for "Start" action */
+        }
+        #toggleAutoClick.off:hover {
+            background-color: #27ae60;
+        }
+
+        p, label {
+            margin: 8px 0;
+            font-size: 1em;
+            line-height: 1.5;
+        }
+        span {
+            font-weight: bold;
+            color: #3498db;
+        }
+        #status, #error, #autoClickStatus {
+            font-style: italic;
+            min-height: 1.5em; /* Prevent layout shifts */
+        }
+        #error {
+            color: #e74c3c; /* Red for errors */
+            font-weight: bold;
+        }
+        .warning {
+            color: #f39c12; /* Orange for warnings */
+            font-weight: bold;
+            border: 1px solid #f39c12;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 8px;
+            background-color: #fffbe6; /* Light yellow background for warning */
+        }
+        input[type="range"], input[type="number"] {
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        .controls-grid {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: 5px 10px;
+            align-items: center;
+        }
+        .controls-grid label {
+            justify-self: start;
+        }
+        .controls-grid input[type="range"] {
+            width: 100%;
         }
     </style>
 </head>
 <body>
+    <h1>Sound Distance Measurement & Clicker</h1>
+
+    <div class="warning">
+        <strong>Warning:</strong> This tool is highly experimental and <strong>NOT ACCURATE</strong> for distance.
+        Results will vary greatly. Use the auto-clicker to help calibrate thresholds.
+    </div>
+
     <div class="container">
-        <h1>Continuous Clicker</h1>
-        <button id="toggleClicker" class="off">Start Clicking</button>
+        <h2>Main Controls</h2>
+        <button id="startMeasurement">Start Single Measurement</button>
+        <button id="toggleAutoClick" class="off">Auto-Click OFF</button>
         <p id="status">Status: Idle</p>
-        <p class="info">Click the button to start or stop a click sound every 500ms.</p>
+        <p id="autoClickStatus">Auto-Click: OFF</p>
+        <p id="error"></p>
+    </div>
+
+    <div class="container">
+        <h2>Measurement Results</h2>
+        <p>Time Difference (Δt): <span id="deltaTime">-</span> ms</p>
+        <p>Estimated Distance: <span id="distance">-</span> meters</p>
+    </div>
+
+    <div class="container">
+        <h2>Debug & Calibration</h2>
+        <p>Max Amplitude Detected (Live): <span id="maxAmplitude">-</span></p>
+        <p>Last Click Heard Amplitude: <span id="clickAmplitude">-</span></p>
+        <p>Last Echo Heard Amplitude: <span id="echoAmplitude">-</span></p>
+        <div class="controls-grid">
+            <label for="clickThreshold">Click Threshold:</label>
+            <input type="range" id="clickThreshold" min="0.05" max="1" step="0.01" value="0.3">
+            <span id="clickThresholdValue">0.3</span>
+
+            <label for="echoThreshold">Echo Threshold:</label>
+            <input type="range" id="echoThreshold" min="0.01" max="0.5" step="0.01" value="0.05">
+            <span id="echoThresholdValue">0.05</span>
+
+            <label for="refractoryPeriod">Refractory (ms):</label>
+            <input type="number" id="refractoryPeriod" value="50" min="10" max="500" style="width: 70px;">
+            <span></span> <label for="echoTimeout">Max Echo Wait (ms):</label>
+            <input type="number" id="echoTimeout" value="1000" min="100" max="3000" style="width: 70px;">
+            <span></span> </div>
     </div>
 
     <script>
-        const toggleButton = document.getElementById('toggleClicker');
+        const startMeasurementButton = document.getElementById('startMeasurement');
+        const toggleAutoClickButton = document.getElementById('toggleAutoClick');
+
         const statusDisplay = document.getElementById('status');
+        const autoClickStatusDisplay = document.getElementById('autoClickStatus');
+        const errorDisplay = document.getElementById('error');
+
+        const deltaTimeDisplay = document.getElementById('deltaTime');
+        const distanceDisplay = document.getElementById('distance');
+        const maxAmplitudeDisplay = document.getElementById('maxAmplitude');
+        const clickAmplitudeDisplay = document.getElementById('clickAmplitude');
+        const echoAmplitudeDisplay = document.getElementById('echoAmplitude');
+
+        const clickThresholdInput = document.getElementById('clickThreshold');
+        const clickThresholdValueDisplay = document.getElementById('clickThresholdValue');
+        const echoThresholdInput = document.getElementById('echoThreshold');
+        const echoThresholdValueDisplay = document.getElementById('echoThresholdValue');
+        const refractoryPeriodInput = document.getElementById('refractoryPeriod');
+        const echoTimeoutInput = document.getElementById('echoTimeout');
+
+        clickThresholdInput.oninput = () => clickThresholdValueDisplay.textContent = clickThresholdInput.value;
+        echoThresholdInput.oninput = () => echoThresholdValueDisplay.textContent = echoThresholdInput.value;
 
         let audioContext;
-        let clickIntervalId = null; // To store the ID of the interval
-        let isClicking = false; // State to track if clicking is active
-        const CLICK_INTERVAL_MS = 500;
+        let analyserNode;
+        let microphoneSource;
 
-        // Function to initialize or resume AudioContext
-        function initAudioContext() {
+        let clickEmittedTime = 0;
+        let clickHeardTime = 0;
+        let echoDetectedTime = 0;
+        let analysisAnimationFrameId;
+        let analysisTimeoutId = null; // For echo timeout
+
+        // States for main measurement: 'idle', 'requesting_mic', 'playing_click', 'listening_click', 'listening_echo', 'finished', 'error'
+        let measurementState = 'idle';
+        const SPEED_OF_SOUND_MPS = 343; // meters per second at ~20°C
+
+        // Auto-clicker state
+        let isAutoClicking = false;
+        let autoClickIntervalId = null;
+        const AUTO_CLICK_INTERVAL_MS = 500;
+
+        // --- Utility Functions ---
+        function updateStatus(message) {
+            statusDisplay.textContent = `Status: ${message}`;
+            console.log(`Main Status: ${message}`);
+        }
+        function updateAutoClickStatus(message) {
+            autoClickStatusDisplay.textContent = `Auto-Click: ${message}`;
+            console.log(`Auto-Click Status: ${message}`);
+        }
+        function updateError(message) {
+            errorDisplay.textContent = message;
+            console.error(message);
+        }
+
+        // --- AudioContext Management ---
+        async function initAudioContext() {
             if (!audioContext || audioContext.state === 'closed') {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
             if (audioContext.state === 'suspended') {
-                audioContext.resume();
+                try {
+                    await audioContext.resume();
+                    console.log("AudioContext resumed.");
+                } catch (e) {
+                    updateError("Failed to resume AudioContext. Please interact with the page.");
+                    return false;
+                }
             }
+            return audioContext.state === 'running';
         }
 
-        // Function to play a single click sound
-        function playClick() {
+        // --- Sound Playing Functions ---
+        function playSoundForMeasurement() {
+            // This function is specifically for the measurement click
             if (!audioContext || audioContext.state !== 'running') {
-                console.warn("AudioContext not running. Cannot play click.");
-                // Attempt to re-initialize if it's not running (e.g., after page was idle)
-                initAudioContext();
-                if (!audioContext || audioContext.state !== 'running') return;
+                updateError("AudioContext not ready for measurement click.");
+                return false;
             }
-
-            // Create a short, sharp click sound
-            // Buffer duration: 0.01 seconds (10ms)
-            const bufferDuration = 0.01;
-            const clickBuffer = audioContext.createBuffer(1, audioContext.sampleRate * bufferDuration, audioContext.sampleRate);
+            const clickBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.01, audioContext.sampleRate);
             const channelData = clickBuffer.getChannelData(0);
-
-            // Simple impulse-like sound
-            // A few sharp samples for a "tick" or "click" sound
-            channelData[0] = 0.8; // Start with a strong positive peak
-            channelData[1] = -0.6; // Followed by a negative peak to make it sharper
-            channelData[2] = 0.4;
-            channelData[3] = -0.2;
-            // Rest of the buffer is silence
-            for (let i = 4; i < channelData.length; i++) {
-                channelData[i] = 0;
-            }
+            channelData[0] = 0.9; channelData[1] = 1.0; channelData[2] = 0.9; channelData[3] = 0.5; channelData[4] = 0.2;
+            for (let i = 5; i < channelData.length; i++) channelData[i] = 0;
 
             const source = audioContext.createBufferSource();
             source.buffer = clickBuffer;
-
-            // Optional: Add a gain node for volume control, though for a simple click it might be overkill
             const gainNode = audioContext.createGain();
-            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // Adjust volume (0.0 to 1.0)
+            gainNode.gain.setValueAtTime(1.0, audioContext.currentTime);
+            source.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            clickEmittedTime = performance.now(); // Critical for measurement
+            source.start();
+            source.onended = () => {
+                source.disconnect();
+                gainNode.disconnect();
+            };
+            return true;
+        }
 
+        function playAudibleClickOnly() {
+            // This function is for the auto-clicker, doesn't affect measurement timing
+            if (!audioContext || audioContext.state !== 'running') {
+                console.warn("AudioContext not running for auto-click. Attempting to init.");
+                initAudioContext().then(success => {
+                    if (success && audioContext.state === 'running') {
+                         // Retry playing click if context is now running
+                        const clickBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.01, audioContext.sampleRate);
+                        const channelData = clickBuffer.getChannelData(0);
+                        channelData[0] = 0.8; channelData[1] = -0.6; channelData[2] = 0.4; channelData[3] = -0.2;
+                        for (let i = 4; i < channelData.length; i++) channelData[i] = 0;
+
+                        const source = audioContext.createBufferSource();
+                        source.buffer = clickBuffer;
+                        const gainNode = audioContext.createGain();
+                        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // Auto-click slightly quieter
+                        source.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        source.start();
+                        source.onended = () => {
+                            source.disconnect();
+                            gainNode.disconnect();
+                        };
+                    } else {
+                         console.warn("AudioContext still not running after attempt for auto-click.");
+                    }
+                });
+                return; // Exit, will try again on next interval if context starts
+            }
+            // Normal play if context is already running
+            const clickBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.01, audioContext.sampleRate);
+            const channelData = clickBuffer.getChannelData(0);
+            channelData[0] = 0.8; channelData[1] = -0.6; channelData[2] = 0.4; channelData[3] = -0.2;
+            for (let i = 4; i < channelData.length; i++) channelData[i] = 0;
+
+            const source = audioContext.createBufferSource();
+            source.buffer = clickBuffer;
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // Auto-click slightly quieter
             source.connect(gainNode);
             gainNode.connect(audioContext.destination);
             source.start();
-
-            // Clean up the source node after it has finished playing
             source.onended = () => {
                 source.disconnect();
                 gainNode.disconnect();
             };
         }
 
-        toggleButton.addEventListener('click', () => {
-            // Initialize AudioContext on the first user interaction
-            initAudioContext();
+        // --- Auto-Clicker Logic ---
+        toggleAutoClickButton.addEventListener('click', async () => {
+            if (!await initAudioContext()) {
+                updateError("AudioContext could not be started. Please click the page or button again.");
+                return;
+            }
 
-            if (isClicking) {
-                // If currently clicking, stop it
-                if (clickIntervalId) {
-                    clearInterval(clickIntervalId);
-                    clickIntervalId = null;
-                }
-                isClicking = false;
-                toggleButton.textContent = 'Start Clicking';
-                toggleButton.classList.remove('on');
-                toggleButton.classList.add('off');
-                statusDisplay.textContent = 'Status: Stopped';
-                console.log("Clicking stopped.");
-            } else {
-                // If not clicking, start it
-                playClick(); // Play the first click immediately
-                clickIntervalId = setInterval(playClick, CLICK_INTERVAL_MS);
-                isClicking = true;
-                toggleButton.textContent = 'Stop Clicking';
-                toggleButton.classList.remove('off');
-                toggleButton.classList.add('on');
-                statusDisplay.textContent = `Status: Clicking every ${CLICK_INTERVAL_MS}ms`;
-                console.log("Clicking started.");
+            if (isAutoClicking) { // Stop auto-clicking
+                clearInterval(autoClickIntervalId);
+                autoClickIntervalId = null;
+                isAutoClicking = false;
+                toggleAutoClickButton.textContent = 'Auto-Click OFF';
+                toggleAutoClickButton.classList.remove('on');
+                toggleAutoClickButton.classList.add('off');
+                updateAutoClickStatus('OFF');
+            } else { // Start auto-clicking
+                playAudibleClickOnly(); // Play first click immediately
+                autoClickIntervalId = setInterval(playAudibleClickOnly, AUTO_CLICK_INTERVAL_MS);
+                isAutoClicking = true;
+                toggleAutoClickButton.textContent = 'Auto-Click ON';
+                toggleAutoClickButton.classList.remove('off');
+                toggleAutoClickButton.classList.add('on');
+                updateAutoClickStatus(`ON (every ${AUTO_CLICK_INTERVAL_MS}ms)`);
             }
         });
 
-        // Optional: Clean up if the window is closed or navigated away
+        function stopAutoClickerIfRunning() {
+            if (isAutoClicking) {
+                clearInterval(autoClickIntervalId);
+                autoClickIntervalId = null;
+                isAutoClicking = false;
+                toggleAutoClickButton.textContent = 'Auto-Click OFF';
+                toggleAutoClickButton.classList.remove('on');
+                toggleAutoClickButton.classList.add('off');
+                updateAutoClickStatus('OFF (Stopped by measurement)');
+                console.log("Auto-clicker stopped for measurement.");
+            }
+        }
+
+
+        // --- Measurement Logic ---
+        startMeasurementButton.addEventListener('click', async () => {
+            if (measurementState !== 'idle' && measurementState !== 'finished' && measurementState !== 'error') {
+                updateError("Measurement already in progress or system busy.");
+                return;
+            }
+            
+            stopAutoClickerIfRunning(); // Stop auto-clicker before starting measurement
+            resetMeasurementValues();
+            
+            if (!await initAudioContext()) {
+                updateError("AudioContext could not be started for measurement. Please click the page or button again.");
+                measurementState = 'error';
+                startMeasurementButton.disabled = false;
+                toggleAutoClickButton.disabled = false;
+                return;
+            }
+
+            measurementState = 'requesting_mic';
+            updateStatus('Requesting microphone...');
+            startMeasurementButton.disabled = true;
+            toggleAutoClickButton.disabled = true; // Disable while measuring
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                
+                microphoneSource = audioContext.createMediaStreamSource(stream);
+                analyserNode = audioContext.createAnalyser();
+                analyserNode.fftSize = 2048;
+                analyserNode.smoothingTimeConstant = 0; // No smoothing
+
+                microphoneSource.connect(analyserNode);
+
+                if (!playSoundForMeasurement()) { // This plays the click and sets clickEmittedTime
+                    throw new Error("Failed to play measurement sound.");
+                }
+                
+                updateStatus('Click played. Listening for click in mic...');
+                measurementState = 'listening_click';
+                analyseSoundForMeasurement(); // Start the analysis loop
+
+            } catch (err) {
+                measurementState = 'error';
+                updateError(`Error during measurement setup: ${err.message}`);
+                updateStatus('Error');
+                stopAudioProcessing(); // This will re-enable buttons
+            }
+        });
+
+        function resetMeasurementValues() {
+            deltaTimeDisplay.textContent = '-';
+            distanceDisplay.textContent = '-';
+            // maxAmplitudeDisplay.textContent = '-'; // Keep live max amplitude updating
+            clickAmplitudeDisplay.textContent = '-';
+            echoAmplitudeDisplay.textContent = '-';
+            errorDisplay.textContent = '';
+            clickEmittedTime = 0;
+            clickHeardTime = 0;
+            echoDetectedTime = 0;
+            if (analysisAnimationFrameId) {
+                cancelAnimationFrame(analysisAnimationFrameId);
+                analysisAnimationFrameId = null;
+            }
+            if(analysisTimeoutId) {
+                clearTimeout(analysisTimeoutId);
+                analysisTimeoutId = null;
+            }
+        }
+        
+        function analyseSoundForMeasurement() {
+            const CLICK_DETECTION_THRESHOLD = parseFloat(clickThresholdInput.value);
+            const ECHO_DETECTION_THRESHOLD = parseFloat(echoThresholdInput.value);
+            const REFRACTORY_PERIOD_MS = parseInt(refractoryPeriodInput.value);
+            const MAX_ECHO_WAIT_MS = parseInt(echoTimeoutInput.value);
+
+            const bufferLength = analyserNode.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyserNode.getByteTimeDomainData(dataArray);
+
+            let maxValInFrame = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const normalizedValue = Math.abs(dataArray[i] - 128) / 128;
+                if (normalizedValue > maxValInFrame) {
+                    maxValInFrame = normalizedValue;
+                }
+            }
+            maxAmplitudeDisplay.textContent = maxValInFrame.toFixed(3); // Live update
+            
+            const currentTime = performance.now();
+
+            if (measurementState === 'listening_click') {
+                if (maxValInFrame > CLICK_DETECTION_THRESHOLD) {
+                    clickHeardTime = currentTime;
+                    clickAmplitudeDisplay.textContent = maxValInFrame.toFixed(3);
+                    updateStatus(`Click heard in mic. Waiting for echo...`);
+                    measurementState = 'listening_echo';
+                    
+                    if(analysisTimeoutId) clearTimeout(analysisTimeoutId); // Clear any previous
+                    analysisTimeoutId = setTimeout(() => {
+                        if (measurementState === 'listening_echo') { // Check state again inside timeout
+                            updateStatus('Echo timeout. No echo detected or too faint.');
+                            measurementState = 'finished'; // Or 'error_timeout'
+                            stopAudioProcessing();
+                        }
+                    }, MAX_ECHO_WAIT_MS);
+
+                } else if (currentTime - clickEmittedTime > 700) { // Increased timeout for detecting own click
+                    updateStatus('Did not detect own click clearly. Adjust volume or click threshold.');
+                    measurementState = 'error';
+                    stopAudioProcessing();
+                    return; 
+                }
+            } else if (measurementState === 'listening_echo') {
+                if (currentTime > clickHeardTime + REFRACTORY_PERIOD_MS) {
+                    if (maxValInFrame > ECHO_DETECTION_THRESHOLD) {
+                        if(analysisTimeoutId) clearTimeout(analysisTimeoutId); // Clear echo timeout
+                        echoDetectedTime = currentTime;
+                        echoAmplitudeDisplay.textContent = maxValInFrame.toFixed(3);
+                        const deltaTime = echoDetectedTime - clickHeardTime;
+                        deltaTimeDisplay.textContent = deltaTime.toFixed(2);
+
+                        const distance = (SPEED_OF_SOUND_MPS * (deltaTime / 1000)) / 2;
+                        distanceDisplay.textContent = distance.toFixed(2);
+                        
+                        updateStatus('Echo detected!');
+                        measurementState = 'finished';
+                        stopAudioProcessing();
+                        return; 
+                    }
+                }
+            }
+
+            if (measurementState.startsWith('listening_') || measurementState === 'playing_click') {
+                analysisAnimationFrameId = requestAnimationFrame(analyseSoundForMeasurement);
+            }
+        }
+
+        function stopAudioProcessing() {
+            if (analysisAnimationFrameId) {
+                cancelAnimationFrame(analysisAnimationFrameId);
+                analysisAnimationFrameId = null;
+            }
+            if (microphoneSource) {
+                microphoneSource.disconnect();
+                const tracks = microphoneSource.mediaStream.getTracks();
+                tracks.forEach(track => track.stop()); // Important to release mic
+                microphoneSource = null;
+            }
+            // Do not disconnect analyserNode if it's shared or might be reused by auto-clicker's live view.
+            // For now, we re-create it each time for measurement.
+            if (analyserNode) {
+                 // analyserNode.disconnect(); // Disconnecting here might be problematic if we want live view always
+                 // analyserNode = null; // Let's keep it simple: analyserNode is only for measurement lifecycle
+            }
+            
+            updateStatus(measurementState === 'finished' ? 'Finished.' : (measurementState === 'error' ? 'Error.' : 'Stopped.'));
+            startMeasurementButton.disabled = false;
+            toggleAutoClickButton.disabled = false; // Re-enable auto-click button
+            
+            // Note: AudioContext is not closed here, as the auto-clicker might want to use it.
+            // It will be closed on page unload.
+        }
+
+        // Cleanup on page leave
         window.addEventListener('beforeunload', () => {
-            if (clickIntervalId) {
-                clearInterval(clickIntervalId);
+            if (autoClickIntervalId) {
+                clearInterval(autoClickIntervalId);
+            }
+            if (measurementState !== 'idle' && measurementState !== 'finished' && measurementState !== 'error') {
+                stopAudioProcessing(); // Ensure mic is released
             }
             if (audioContext && audioContext.state !== 'closed') {
-                audioContext.close().catch(e => console.warn("Error closing audio context:", e));
+                audioContext.close().catch(e => console.warn("Error closing audio context on unload:", e));
             }
         });
 
     </script>
 </body>
 </html>
-
