@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experimental Sound Distance Measurement</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        #controls, #results, #debug {
+            background-color: #fff;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 500px;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+        }
+        p {
+            margin: 5px 0;
+        }
+        #status, #error {
+            color: #333;
+            font-style: italic;
+        }
+        #error {
+            color: red;
+        }
+        .warning {
+            color: orange;
+            font-weight: bold;
+            border: 1px solid orange;
+            padding: 10px;
+            margin-top: 15px;
+            border-radius: 4px;
+        }
+        #peakInfo {
+            font-size: 0.9em;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <h1>Experimental Sound Distance Measurement</h1>
+
+    <div class="warning">
+        <strong>Warning:</strong> This tool is highly experimental and <strong>NOT ACCURATE</strong>.
+        Results will vary greatly and should not be used for any practical purpose.
+        It works best in a quiet room with a clear, hard surface to reflect sound.
+    </div>
+
+    <div id="controls">
+        <h2>Controls</h2>
+        <button id="startMeasurement">Start Measurement</button>
+        <p id="status">Status: Idle</p>
+        <p id="error"></p>
+    </div>
+
+    <div id="results">
+        <h2>Results</h2>
+        <p>Time Difference (Δt): <span id="deltaTime">-</span> ms</p>
+        <p>Estimated Distance: <span id="distance">-</span> meters</p>
+    </div>
+
+    <div id="debug">
+        <h2>Debug Info</h2>
+        <p>Max Amplitude Detected: <span id="maxAmplitude">-</span></p>
+        <p>Click Heard Amplitude: <span id="clickAmplitude">-</span></p>
+        <p>Echo Heard Amplitude: <span id="echoAmplitude">-</span></p>
+        <label for="clickThreshold">Click Detection Threshold (0-1):</label>
+        <input type="range" id="clickThreshold" min="0.05" max="1" step="0.01" value="0.3">
+        <span id="clickThresholdValue">0.3</span><br>
+        <label for="echoThreshold">Echo Detection Threshold (0-1):</label>
+        <input type="range" id="echoThreshold" min="0.01" max="0.5" step="0.01" value="0.05">
+        <span id="echoThresholdValue">0.05</span><br>
+        <label for="refractoryPeriod">Refractory Period (ms):</label>
+        <input type="number" id="refractoryPeriod" value="50" min="10" max="500">
+        <label for="echoTimeout">Max Echo Wait (ms):</label>
+        <input type="number" id="echoTimeout" value="1000" min="100" max="3000">
+    </div>
+
+    <script>
+        const startButton = document.getElementById('startMeasurement');
+        const statusDisplay = document.getElementById('status');
+        const errorDisplay = document.getElementById('error');
+        const deltaTimeDisplay = document.getElementById('deltaTime');
+        const distanceDisplay = document.getElementById('distance');
+        const maxAmplitudeDisplay = document.getElementById('maxAmplitude');
+        const clickAmplitudeDisplay = document.getElementById('clickAmplitude');
+        const echoAmplitudeDisplay = document.getElementById('echoAmplitude');
+
+        const clickThresholdInput = document.getElementById('clickThreshold');
+        const clickThresholdValueDisplay = document.getElementById('clickThresholdValue');
+        const echoThresholdInput = document.getElementById('echoThreshold');
+        const echoThresholdValueDisplay = document.getElementById('echoThresholdValue');
+        const refractoryPeriodInput = document.getElementById('refractoryPeriod');
+        const echoTimeoutInput = document.getElementById('echoTimeout');
+
+        clickThresholdInput.oninput = () => clickThresholdValueDisplay.textContent = clickThresholdInput.value;
+        echoThresholdInput.oninput = () => echoThresholdValueDisplay.textContent = echoThresholdInput.value;
+
+        let audioContext;
+        let analyserNode;
+        let microphoneSource;
+        let processingNode;
+
+        let clickEmittedTime = 0;
+        let clickHeardTime = 0;
+        let echoDetectedTime = 0;
+        let animationFrameId;
+
+        const SPEED_OF_SOUND_MPS = 343; // meters per second at ~20°C
+
+        // States: 'idle', 'requesting_mic', 'playing_click', 'listening_click', 'listening_echo', 'finished', 'error'
+        let currentState = 'idle';
+
+        function updateStatus(message) {
+            statusDisplay.textContent = `Status: ${message}`;
+            console.log(message);
+        }
+
+        function updateError(message) {
+            errorDisplay.textContent = message;
+            console.error(message);
+        }
+
+        startButton.addEventListener('click', async () => {
+            if (currentState !== 'idle' && currentState !== 'finished' && currentState !== 'error') {
+                updateError("Measurement already in progress or system busy.");
+                return;
+            }
+            resetValues();
+            currentState = 'requesting_mic';
+            updateStatus('Requesting microphone permission...');
+            startButton.disabled = true;
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Safety measure for very old contexts that might not auto-resume
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+
+                microphoneSource = audioContext.createMediaStreamSource(stream);
+                analyserNode = audioContext.createAnalyser();
+                analyserNode.fftSize = 2048; // Number of samples to collect for analysis
+                analyserNode.smoothingTimeConstant = 0; // No smoothing for sharp peak detection
+
+                // ScriptProcessorNode is deprecated but good for this kind of direct buffer access if AnalyserNode alone isn't enough.
+                // For simplicity with AnalyserNode, we'll use requestAnimationFrame.
+                // If we used ScriptProcessorNode:
+                // processingNode = audioContext.createScriptProcessor(analyserNode.fftSize / 2, 1, 1);
+                // microphoneSource.connect(processingNode);
+                // processingNode.connect(audioContext.destination); // Keep alive
+                // processingNode.onaudioprocess = processAudio;
+
+                microphoneSource.connect(analyserNode); // AnalyserNode doesn't need to connect to destination
+
+                playClickAndListen();
+
+            } catch (err) {
+                currentState = 'error';
+                updateError(`Error accessing microphone: ${err.message}`);
+                updateStatus('Error');
+                startButton.disabled = false;
+            }
+        });
+
+        function resetValues() {
+            deltaTimeDisplay.textContent = '-';
+            distanceDisplay.textContent = '-';
+            maxAmplitudeDisplay.textContent = '-';
+            clickAmplitudeDisplay.textContent = '-';
+            echoAmplitudeDisplay.textContent = '-';
+            errorDisplay.textContent = '';
+            clickEmittedTime = 0;
+            clickHeardTime = 0;
+            echoDetectedTime = 0;
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+        }
+
+        function playClickAndListen() {
+            currentState = 'playing_click';
+            updateStatus('Playing click...');
+
+            // Create a short, sharp click sound
+            const clickBuffer = audioContext.createBuffer(1, audioContext.sampleRate * 0.01, audioContext.sampleRate); // 10ms buffer
+            const channelData = clickBuffer.getChannelData(0);
+            // A few sharp samples
+            channelData[0] = 0.9; // Make it fairly loud
+            channelData[1] = 1.0;
+            channelData[2] = 0.9;
+            channelData[3] = 0.5;
+            channelData[4] = 0.2;
+            for (let i = 5; i < channelData.length; i++) {
+                channelData[i] = 0;
+            }
+
+            const source = audioContext.createBufferSource();
+            source.buffer = clickBuffer;
+            
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(1.0, audioContext.currentTime); // Full volume
+
+            source.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            clickEmittedTime = performance.now();
+            source.start();
+            updateStatus('Click played. Listening for click in mic...');
+            currentState = 'listening_click';
+
+            source.onended = () => {
+                // Small delay to ensure click has fully played out before intense listening
+                // This is mainly to ensure the 'onended' fires before we might misinterpret.
+                // The actual listening loop starts immediately.
+            };
+            
+            // Start the analysis loop
+            analyseSound();
+        }
+        
+        let analysisTimeoutId = null;
+
+        function analyseSound() {
+            const CLICK_DETECTION_THRESHOLD = parseFloat(clickThresholdInput.value);
+            const ECHO_DETECTION_THRESHOLD = parseFloat(echoThresholdInput.value);
+            const REFRACTORY_PERIOD_MS = parseInt(refractoryPeriodInput.value); // Time to ignore sound after initial click detected
+            const MAX_ECHO_WAIT_MS = parseInt(echoTimeoutInput.value); // Max time to wait for an echo after click is heard
+
+            const bufferLength = analyserNode.frequencyBinCount; // Same as fftSize / 2
+            const dataArray = new Uint8Array(bufferLength); // For time domain data (0-255)
+            // const dataArray = new Float32Array(bufferLength); // For more precise time domain data (-1 to 1)
+            // Using Uint8Array as it's common, but Float32Array might be better if analyserNode supports getFloatTimeDomainData well.
+            // For Uint8Array, 128 is silence. Values are 0-255. Max deviation is 127. Normalized: (val - 128)/128
+
+            analyserNode.getByteTimeDomainData(dataArray);
+
+            let maxVal = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const normalizedValue = Math.abs(dataArray[i] - 128) / 128; // Normalize to 0-1 range
+                if (normalizedValue > maxVal) {
+                    maxVal = normalizedValue;
+                }
+            }
+            maxAmplitudeDisplay.textContent = maxVal.toFixed(3);
+            
+            const currentTime = performance.now();
+
+            if (currentState === 'listening_click') {
+                if (maxVal > CLICK_DETECTION_THRESHOLD) {
+                    clickHeardTime = currentTime;
+                    clickAmplitudeDisplay.textContent = maxVal.toFixed(3);
+                    updateStatus(`Click heard in mic at ${clickHeardTime.toFixed(0)}ms. Waiting for echo...`);
+                    currentState = 'listening_echo';
+                    
+                    // Set a timeout for how long we'll listen for an echo
+                    if(analysisTimeoutId) clearTimeout(analysisTimeoutId);
+                    analysisTimeoutId = setTimeout(() => {
+                        if (currentState === 'listening_echo') {
+                            updateStatus('Echo timeout. No echo detected or too faint.');
+                            currentState = 'finished';
+                            stopAudioProcessing();
+                            startButton.disabled = false;
+                        }
+                    }, MAX_ECHO_WAIT_MS);
+
+                } else if (currentTime - clickEmittedTime > 500) { // Give up if click not heard in mic soon
+                    updateStatus('Did not detect own click clearly. Try adjusting volume or click threshold.');
+                    currentState = 'error';
+                    stopAudioProcessing();
+                    startButton.disabled = false;
+                    return; // Stop analysis
+                }
+            } else if (currentState === 'listening_echo') {
+                // Wait for refractory period after hearing the click to avoid its tail
+                if (currentTime > clickHeardTime + REFRACTORY_PERIOD_MS) {
+                    if (maxVal > ECHO_DETECTION_THRESHOLD) {
+                        echoDetectedTime = currentTime;
+                        echoAmplitudeDisplay.textContent = maxVal.toFixed(3);
+                        const deltaTime = echoDetectedTime - clickHeardTime;
+                        deltaTimeDisplay.textContent = deltaTime.toFixed(2);
+
+                        const distance = (SPEED_OF_SOUND_MPS * (deltaTime / 1000)) / 2;
+                        distanceDisplay.textContent = distance.toFixed(2);
+                        
+                        updateStatus('Echo detected!');
+                        currentState = 'finished';
+                        stopAudioProcessing();
+                        startButton.disabled = false;
+                        if(analysisTimeoutId) clearTimeout(analysisTimeoutId);
+                        return; // Stop analysis
+                    }
+                }
+            }
+
+            if (currentState.startsWith('listening_') || currentState === 'playing_click') {
+                animationFrameId = requestAnimationFrame(analyseSound);
+            }
+        }
+
+        function stopAudioProcessing() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            if (microphoneSource) {
+                microphoneSource.disconnect();
+                // Stop all tracks on the stream to turn off the mic indicator
+                const tracks = microphoneSource.mediaStream.getTracks();
+                tracks.forEach(track => track.stop());
+                microphoneSource = null;
+            }
+            if (processingNode) {
+                processingNode.disconnect();
+                processingNode = null;
+            }
+            if (analyserNode) {
+                analyserNode.disconnect();
+                analyserNode = null;
+            }
+            if (audioContext && audioContext.state !== 'closed') {
+                audioContext.close().catch(e => console.warn("Error closing audio context:", e));
+                audioContext = null;
+            }
+            updateStatus(currentState === 'finished' ? 'Finished.' : 'Stopped.');
+            startButton.disabled = false;
+        }
+
+    </script>
+</body>
+</html>
