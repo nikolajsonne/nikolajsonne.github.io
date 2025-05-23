@@ -1,103 +1,127 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Browser Sonar Tape Measure</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Tailwind CSS (CDN) -->
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center bg-slate-100">
-  <div class="bg-white rounded-2xl shadow-xl p-6 w-80 text-center">
-    <h1 class="text-xl font-bold mb-4">Browser Sonar</h1>
-    <p id="status" class="text-sm text-gray-600 mb-4">Tap Start to measure</p>
-    <p id="distance" class="text-4xl font-semibold mb-4">--</p>
-    <button id="startBtn" class="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition">Start</button>
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-96 max-w-full">
+    <h1 class="text-xl font-bold mb-4 text-center">Browser Sonar</h1>
+
+    <!-- Controls ------------------------------------------------------------>
+    <div id="controls" class="grid grid-cols-2 gap-4 text-sm mb-6">
+      <label class="flex flex-col">Pulse length (ms)
+        <input type="number" id="pulseLen" value="5" min="1" max="20" class="border rounded p-1">
+      </label>
+      <label class="flex flex-col">Pulse gain (0‑1)
+        <input type="number" id="pulseGain" value="0.8" min="0.1" max="1" step="0.05" class="border rounded p-1">
+      </label>
+      <label class="flex flex-col">Interval (ms)
+        <input type="number" id="intervalMs" value="750" min="100" max="2000" class="border rounded p-1">
+      </label>
+      <label class="flex flex-col">Min ignore (ms)
+        <input type="number" id="minEchoMs" value="10" min="1" max="100" class="border rounded p-1">
+      </label>
+    </div>
+
+    <!-- Display ------------------------------------------------------------->
+    <p id="status" class="text-center text-gray-600 text-sm mb-2">Idle</p>
+    <p id="distance" class="text-center text-4xl font-semibold mb-4">--</p>
+    <button id="toggleBtn" class="w-full bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 transition">
+      Start
+    </button>
   </div>
 
+  <!-- Script ---------------------------------------------------------------->
   <script type="module">
   // UI elements
-  const statusEl  = document.getElementById('status');
-  const distanceEl= document.getElementById('distance');
-  const startBtn  = document.getElementById('startBtn');
+  const statusEl     = document.getElementById('status');
+  const distanceEl   = document.getElementById('distance');
+  const toggleBtn    = document.getElementById('toggleBtn');
+  // control inputs
+  const pulseLenIn   = document.getElementById('pulseLen');
+  const pulseGainIn  = document.getElementById('pulseGain');
+  const intervalIn   = document.getElementById('intervalMs');
+  const minEchoIn    = document.getElementById('minEchoMs');
 
-  // constants
-  const SAMPLE_RATE   = 48000;               // Hz
-  const PULSE_LENGTH  = 256;                 // samples (~5.3 ms)
-  const PULSE_GAIN    = 0.8;                 // speaker level
-  const C_SOUND       = 343.2;               // m/s @ 20 °C
-  const MIN_ECHO_SAMP = 500;                 // ignore <10 ms (direct path)
+  // constants (fixed)
+  const SAMPLE_RATE = 48000;           // Hz
+  const C_SOUND     = 343.2;           // m/s @ 20 °C
 
-  // globals
-  let ctx, workletNode, intervalId;
+  // runtime vars
+  let ctx, workletNode, stream, pingTimer, running = false;
 
-  startBtn.addEventListener('click', async () => {
-    startBtn.disabled = true;
-    try {
-      await run();
-    } catch (err) {
-      console.error(err);
-      statusEl.textContent = err.message || err;
-    }
-  });
+  toggleBtn.addEventListener('click', () => running ? stop() : start());
 
-  async function run(){
-    statusEl.textContent = 'Requesting microphone…';
+  async function start(){
+    running = true;
+    toggleBtn.textContent = 'Stop';
+    statusEl.textContent  = 'Requesting microphone…';
+    distanceEl.textContent= '--';
 
-    // create audio context (user‑gesture already satisfied)
-    ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: SAMPLE_RATE});
+    // ---- read controls ----------------------------------------------------
+    const pulseLenMs   = clamp(+pulseLenIn.value, 1, 20);
+    const PULSE_LENGTH = Math.round(pulseLenMs * SAMPLE_RATE / 1000);
+    const PULSE_GAIN   = clamp(+pulseGainIn.value, 0.05, 1);
+    const intervalMs   = clamp(+intervalIn.value, 100, 2000);
+    const minEchoMs    = clamp(+minEchoIn.value, 1, 100);
+    const MIN_ECHO_SAMP= Math.round(minEchoMs * SAMPLE_RATE / 1000);
 
-    // build pulse buffer — simple rectangular click
+    // ---- audio setup ------------------------------------------------------
+    ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate:SAMPLE_RATE});
+
+    // pulse buffer (rectangular)
     const pulseBuf = ctx.createBuffer(1, PULSE_LENGTH, ctx.sampleRate);
     pulseBuf.getChannelData(0).fill(PULSE_GAIN);
 
-    // --- AudioWorkletProcessor code as a blob --------------------------------
+    // AudioWorklet code -----------------------------------------------------
     const processorCode = `
       class TofProcessor extends AudioWorkletProcessor {
         constructor(){
           super();
-          this.ref  = null;                       // Float32Array reference pulse
-          this.buf  = new Float32Array(8192);      // sliding buffer (≈170 ms)
+          this.ref = null; // Float32Array
+          this.minLag = 500;
+          this.buf = new Float32Array(8192);
           this.wpos = 0;
           this.lastEmit = 0;
-          this.SR   = sampleRate;
-          this.MIN  = ${MIN_ECHO_SAMP};
+          this.SR = sampleRate;
           this.port.onmessage = e => {
-            if (e.data.type === 'pulse') this.ref = e.data.buf;
+            if(e.data.type==='pulse') this.ref = e.data.buf;
+            if(e.data.type==='config') this.minLag = e.data.minLag|0;
           };
         }
         process(inputs){
           if(!this.ref) return true;
           const input = inputs[0][0];
           if(!input) return true;
-          // write into ring buffer
+
+          // ring‑buffer write
           this.buf.set(input, this.wpos);
           this.wpos = (this.wpos + input.length) % this.buf.length;
 
-          // analyse every 100 ms
           if(currentTime - this.lastEmit < 0.1) return true;
           this.lastEmit = currentTime;
 
-          // copy contiguous window ending at newest sample
-          const winLen = this.ref.length + this.MIN + 1024;
+          const winLen = this.ref.length + this.minLag + 1024;
           let win = new Float32Array(winLen);
           for(let i=0;i<winLen;i++){
-            const idx = (this.wpos - winLen + i + this.buf.length) % this.buf.length;
-            win[i] = this.buf[idx];
+            const idx=(this.wpos - winLen + i + this.buf.length)%this.buf.length;
+            win[i]=this.buf[idx];
           }
 
-          // crude cross‑correlation search
-          let best = 0, bestLag = -1;
-          for(let lag=this.MIN; lag<winLen - this.ref.length; lag++){
-            let s = 0;
-            for(let j=0;j<this.ref.length;j++) s += this.ref[j] * win[lag+j];
-            if(s > best){ best = s; bestLag = lag; }
+          let best=0, bestLag=-1;
+          for(let lag=this.minLag; lag<winLen - this.ref.length; lag++){
+            let s=0;
+            for(let j=0;j<this.ref.length;j++) s+= this.ref[j]*win[lag+j];
+            if(s>best){best=s; bestLag=lag;}
           }
           if(bestLag>0){
-            const dt = bestLag / this.SR;                   // seconds
-            const d  = dt * ${C_SOUND} / 2;                // metres
-            this.port.postMessage({type:'distance', meters:d});
+            const dt = bestLag / this.SR;
+            const dist = dt * ${C_SOUND}/2;
+            this.port.postMessage({type:'distance', meters:dist});
           }
           return true;
         }
@@ -107,27 +131,34 @@
     const blobURL = URL.createObjectURL(new Blob([processorCode], {type:'application/javascript'}));
     await ctx.audioWorklet.addModule(blobURL);
 
-    // create worklet node
-    workletNode = new AudioWorkletNode(ctx, 'tof-proc');
+    // create worklet node and stream
+    workletNode = new AudioWorkletNode(ctx,'tof-proc');
     workletNode.port.onmessage = e => {
-      if(e.data.type==='distance') showDistance(e.data.meters);
+      if(e.data.type==='distance') updateDistance(e.data.meters);
     };
 
-    // send reference pulse to processor
-    workletNode.port.postMessage({type:'pulse', buf: pulseBuf.getChannelData(0)});
+    workletNode.port.postMessage({type:'pulse', buf:pulseBuf.getChannelData(0)});
+    workletNode.port.postMessage({type:'config', minLag: MIN_ECHO_SAMP});
 
-    // open mic
-    const stream = await navigator.mediaDevices.getUserMedia({
+    stream = await navigator.mediaDevices.getUserMedia({
       audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}
     });
-    const mic = ctx.createMediaStreamSource(stream);
-    mic.connect(workletNode);
+    ctx.createMediaStreamSource(stream).connect(workletNode);
 
     statusEl.textContent = 'Running…';
 
-    // start ping loop
+    // periodic pulses -------------------------------------------------------
     emitPulse(pulseBuf);
-    intervalId = setInterval(()=>emitPulse(pulseBuf), 750);
+    pingTimer = setInterval(()=>emitPulse(pulseBuf), intervalMs);
+  }
+
+  function stop(){
+    running = false;
+    toggleBtn.textContent = 'Start';
+    statusEl.textContent  = 'Stopped';
+    clearInterval(pingTimer);
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+    if(ctx){ ctx.close(); ctx=null; }
   }
 
   function emitPulse(buf){
@@ -137,10 +168,11 @@
     src.start();
   }
 
-  function showDistance(m){
-    if(!Number.isFinite(m) || m<=0) return;
-    distanceEl.textContent = m.toFixed(2) + ' m';
+  function updateDistance(m){
+    if(Number.isFinite(m) && m>0) distanceEl.textContent = m.toFixed(2)+' m';
   }
+
+  const clamp = (v,min,max)=>Math.min(Math.max(v,min),max);
   </script>
 </body>
 </html>
