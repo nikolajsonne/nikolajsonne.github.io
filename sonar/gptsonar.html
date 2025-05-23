@@ -1,0 +1,146 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Browser Sonar Tape Measure</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Tailwind CSS (CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center bg-slate-100">
+  <div class="bg-white rounded-2xl shadow-xl p-6 w-80 text-center">
+    <h1 class="text-xl font-bold mb-4">Browser Sonar</h1>
+    <p id="status" class="text-sm text-gray-600 mb-4">Tap Start to measure</p>
+    <p id="distance" class="text-4xl font-semibold mb-4">--</p>
+    <button id="startBtn" class="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition">Start</button>
+  </div>
+
+  <script type="module">
+  // UI elements
+  const statusEl  = document.getElementById('status');
+  const distanceEl= document.getElementById('distance');
+  const startBtn  = document.getElementById('startBtn');
+
+  // constants
+  const SAMPLE_RATE   = 48000;               // Hz
+  const PULSE_LENGTH  = 256;                 // samples (~5.3 ms)
+  const PULSE_GAIN    = 0.8;                 // speaker level
+  const C_SOUND       = 343.2;               // m/s @ 20 °C
+  const MIN_ECHO_SAMP = 500;                 // ignore <10 ms (direct path)
+
+  // globals
+  let ctx, workletNode, intervalId;
+
+  startBtn.addEventListener('click', async () => {
+    startBtn.disabled = true;
+    try {
+      await run();
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = err.message || err;
+    }
+  });
+
+  async function run(){
+    statusEl.textContent = 'Requesting microphone…';
+
+    // create audio context (user‑gesture already satisfied)
+    ctx = new (window.AudioContext || window.webkitAudioContext)({sampleRate: SAMPLE_RATE});
+
+    // build pulse buffer — simple rectangular click
+    const pulseBuf = ctx.createBuffer(1, PULSE_LENGTH, ctx.sampleRate);
+    pulseBuf.getChannelData(0).fill(PULSE_GAIN);
+
+    // --- AudioWorkletProcessor code as a blob --------------------------------
+    const processorCode = `
+      class TofProcessor extends AudioWorkletProcessor {
+        constructor(){
+          super();
+          this.ref  = null;                       // Float32Array reference pulse
+          this.buf  = new Float32Array(8192);      // sliding buffer (≈170 ms)
+          this.wpos = 0;
+          this.lastEmit = 0;
+          this.SR   = sampleRate;
+          this.MIN  = ${MIN_ECHO_SAMP};
+          this.port.onmessage = e => {
+            if (e.data.type === 'pulse') this.ref = e.data.buf;
+          };
+        }
+        process(inputs){
+          if(!this.ref) return true;
+          const input = inputs[0][0];
+          if(!input) return true;
+          // write into ring buffer
+          this.buf.set(input, this.wpos);
+          this.wpos = (this.wpos + input.length) % this.buf.length;
+
+          // analyse every 100 ms
+          if(currentTime - this.lastEmit < 0.1) return true;
+          this.lastEmit = currentTime;
+
+          // copy contiguous window ending at newest sample
+          const winLen = this.ref.length + this.MIN + 1024;
+          let win = new Float32Array(winLen);
+          for(let i=0;i<winLen;i++){
+            const idx = (this.wpos - winLen + i + this.buf.length) % this.buf.length;
+            win[i] = this.buf[idx];
+          }
+
+          // crude cross‑correlation search
+          let best = 0, bestLag = -1;
+          for(let lag=this.MIN; lag<winLen - this.ref.length; lag++){
+            let s = 0;
+            for(let j=0;j<this.ref.length;j++) s += this.ref[j] * win[lag+j];
+            if(s > best){ best = s; bestLag = lag; }
+          }
+          if(bestLag>0){
+            const dt = bestLag / this.SR;                   // seconds
+            const d  = dt * ${C_SOUND} / 2;                // metres
+            this.port.postMessage({type:'distance', meters:d});
+          }
+          return true;
+        }
+      }
+      registerProcessor('tof-proc', TofProcessor);
+    `;
+    const blobURL = URL.createObjectURL(new Blob([processorCode], {type:'application/javascript'}));
+    await ctx.audioWorklet.addModule(blobURL);
+
+    // create worklet node
+    workletNode = new AudioWorkletNode(ctx, 'tof-proc');
+    workletNode.port.onmessage = e => {
+      if(e.data.type==='distance') showDistance(e.data.meters);
+    };
+
+    // send reference pulse to processor
+    workletNode.port.postMessage({type:'pulse', buf: pulseBuf.getChannelData(0)});
+
+    // open mic
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}
+    });
+    const mic = ctx.createMediaStreamSource(stream);
+    mic.connect(workletNode);
+
+    statusEl.textContent = 'Running…';
+
+    // start ping loop
+    emitPulse(pulseBuf);
+    intervalId = setInterval(()=>emitPulse(pulseBuf), 750);
+  }
+
+  function emitPulse(buf){
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start();
+  }
+
+  function showDistance(m){
+    if(!Number.isFinite(m) || m<=0) return;
+    distanceEl.textContent = m.toFixed(2) + ' m';
+  }
+  </script>
+</body>
+</html>
