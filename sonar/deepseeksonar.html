@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sonar Distance Measurement</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            text-align: center;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            margin: 20px;
+            cursor: pointer;
+        }
+        #result {
+            font-size: 24px;
+            margin: 20px;
+            color: #2c3e50;
+        }
+        #status {
+            color: #7f8c8d;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Acoustic Distance Measurement</h1>
+    <button id="measureButton">Measure Distance</button>
+    <div id="result"></div>
+    <div id="status"></div>
+
+    <script>
+        const measureButton = document.getElementById('measureButton');
+        const resultDiv = document.getElementById('result');
+        const statusDiv = document.getElementById('status');
+
+        let audioContext;
+        let clickTime = 0;
+        const speedOfSound = 343; // m/s at 20°C
+        const detectionThreshold = 0.15; // Amplitude threshold for echo detection
+
+        measureButton.addEventListener('click', async () => {
+            try {
+                statusDiv.textContent = 'Initializing...';
+                resultDiv.textContent = '';
+                
+                // Request microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                // Create audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Create and play click sound
+                const clickDuration = 0.01; // 10 milliseconds
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.frequency.setValueAtTime(3000, audioContext.currentTime);
+                gainNode.gain.setValueAtTime(1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + clickDuration);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.start();
+                clickTime = audioContext.currentTime;
+                
+                statusDiv.textContent = 'Click emitted - listening...';
+
+                // Set up audio processing
+                const microphone = audioContext.createMediaStreamSource(stream);
+                const processor = audioContext.createScriptProcessor(2048, 1, 1);
+                let echoDetected = false;
+
+                // Dummy node to prevent feedback
+                const dummyNode = audioContext.createGain();
+                dummyNode.gain.value = 0;
+                
+                microphone.connect(processor);
+                processor.connect(dummyNode);
+
+                processor.onaudioprocess = (event) => {
+                    if (echoDetected) return;
+
+                    const inputBuffer = event.inputBuffer;
+                    const inputData = inputBuffer.getChannelData(0);
+                    const currentTime = audioContext.currentTime;
+                    const timeSinceClick = currentTime - clickTime;
+
+                    // Look for echo only after 5ms (to ignore direct sound)
+                    if (timeSinceClick > 0.005) {
+                        let maxAmplitude = 0;
+                        for (let i = 0; i < inputData.length; i++) {
+                            maxAmplitude = Math.max(maxAmplitude, Math.abs(inputData[i]));
+                        }
+
+                        if (maxAmplitude > detectionThreshold) {
+                            echoDetected = true;
+                            const travelTime = currentTime - clickTime;
+                            const distance = (travelTime * speedOfSound) / 2;
+
+                            // Update UI
+                            resultDiv.textContent = `${distance.toFixed(2)} meters`;
+                            statusDiv.textContent = 'Measurement complete';
+
+                            // Clean up
+                            processor.disconnect();
+                            microphone.disconnect();
+                            oscillator.stop();
+                            stream.getTracks().forEach(track => track.stop());
+                        }
+                    }
+                };
+
+                // Timeout if no echo detected
+                setTimeout(() => {
+                    if (!echoDetected) {
+                        statusDiv.textContent = 'No echo detected - try again';
+                        processor.disconnect();
+                        microphone.disconnect();
+                        oscillator.stop();
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                }, 2000);
+
+            } catch (error) {
+                statusDiv.textContent = 'Error: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>
