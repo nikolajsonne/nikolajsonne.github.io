@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tic Tac Toe - Gemini Edition</title>
+    <title>Tic Tac Toe - IQ Edition</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -13,24 +13,69 @@
             --accent-o: #f472b6;
             --cell-hover: #334155;
             --border-color: #475569;
+            --button-bg: #334155;
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-color);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
         }
 
-        h1 {
-            margin-bottom: 0.5rem;
-            font-weight: 300;
-            letter-spacing: 2px;
+        .container { text-align: center; max-width: 400px; }
+        h1 { margin-top: 0; font-weight: 300; letter-spacing: 2px; color: var(--accent-x); }
+
+        .controls-panel {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        .mode-selector {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .mode-btn {
+            background: var(--button-bg);
+            color: white;
+            border: 2px solid transparent;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active { border-color: var(--accent-x); background: #475569; }
+
+        /* Slider Styling */
+        .slider-container {
+            margin: 15px 0;
+            display: none; /* Hidden by default in PvP */
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent-x);
         }
 
         #status {
@@ -48,7 +93,8 @@
             background-color: var(--border-color);
             padding: 10px;
             border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            margin: 0 auto;
         }
 
         .cell {
@@ -63,177 +109,207 @@
             cursor: pointer;
             border-radius: 8px;
             transition: all 0.2s ease;
-            user-select: none;
         }
 
-        .cell:hover:not(.taken) {
-            background-color: var(--cell-hover);
-            transform: scale(1.02);
-        }
-
+        .cell:hover:not(.taken) { background-color: var(--cell-hover); }
         .cell.x { color: var(--accent-x); }
         .cell.o { color: var(--accent-o); }
+        .cell.taken { cursor: not-allowed; }
 
-        .cell.taken {
-            cursor: not-allowed;
-        }
-
-        .controls {
+        .restart-btn {
             margin-top: 2rem;
-        }
-
-        button {
-            padding: 10px 25px;
+            padding: 12px 30px;
             font-size: 1rem;
             background-color: var(--accent-x);
             color: var(--bg-color);
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
-            transition: opacity 0.2s;
         }
 
-        button:hover {
-            opacity: 0.9;
-        }
-
-        button:active {
-            transform: translateY(2px);
-        }
-
-        /* Winning animation */
-        @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
-
-        .winner-cell {
-            animation: pop 0.5s ease-in-out;
-            background-color: #1e293b !important;
-            border: 2px solid gold;
-        }
+        .winner-cell { border: 2px solid gold; box-shadow: inset 0 0 15px rgba(255, 215, 0, 0.3); }
     </style>
 </head>
 <body>
 
-    <h1>TIC TAC TOE</h1>
-    <div id="status">Player X's Turn</div>
+    <div class="container">
+        <h1>TIC TAC TOE</h1>
 
-    <div class="board" id="board">
-        <div class="cell" data-index="0"></div>
-        <div class="cell" data-index="1"></div>
-        <div class="cell" data-index="2"></div>
-        <div class="cell" data-index="3"></div>
-        <div class="cell" data-index="4"></div>
-        <div class="cell" data-index="5"></div>
-        <div class="cell" data-index="6"></div>
-        <div class="cell" data-index="7"></div>
-        <div class="cell" data-index="8"></div>
-    </div>
+        <div class="controls-panel">
+            <div class="mode-selector">
+                <button class="mode-btn active" onclick="setMode('pvp', this)">2 Players</button>
+                <button class="mode-btn" onclick="setMode('pvc', this)">VS Computer</button>
+            </div>
 
-    <div class="controls">
-        <button id="restartBtn">Restart Game</button>
+            <div class="slider-container" id="iq-container">
+                <div class="slider-label">
+                    <span>🐌 Slug</span>
+                    <span>👶 Toddler</span>
+                    <span>🤓 Nerd</span>
+                </div>
+                <input type="range" id="iqSlider" min="0" max="2" value="1">
+                <div style="margin-top: 5px; font-size: 0.8rem; opacity: 0.8;">Computer IQ</div>
+            </div>
+        </div>
+
+        <div id="status">Player X's Turn</div>
+
+        <div class="board" id="board">
+            <div class="cell" data-index="0"></div>
+            <div class="cell" data-index="1"></div>
+            <div class="cell" data-index="2"></div>
+            <div class="cell" data-index="3"></div>
+            <div class="cell" data-index="4"></div>
+            <div class="cell" data-index="5"></div>
+            <div class="cell" data-index="6"></div>
+            <div class="cell" data-index="7"></div>
+            <div class="cell" data-index="8"></div>
+        </div>
+
+        <button class="restart-btn" onclick="restartGame()">Restart Game</button>
     </div>
 
     <script>
-        const boardElement = document.getElementById('board');
         const cells = document.querySelectorAll('.cell');
         const statusText = document.getElementById('status');
-        const restartBtn = document.getElementById('restartBtn');
+        const iqSlider = document.getElementById('iqSlider');
+        const iqContainer = document.getElementById('iq-container');
         
         let currentPlayer = "X";
         let gameState = ["", "", "", "", "", "", "", "", ""];
         let gameActive = true;
+        let gameMode = "pvp";
 
-        const winningConditions = [
-            [0, 1, 2],
-            [3, 4, 5],
-            [6, 7, 8],
-            [0, 3, 6],
-            [1, 4, 7],
-            [2, 5, 8],
-            [0, 4, 8],
-            [2, 4, 6]
-        ];
+        const winConds = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
 
-        function handleCellClick(clickedCellEvent) {
-            const clickedCell = clickedCellEvent.target;
-            const clickedCellIndex = parseInt(clickedCell.getAttribute('data-index'));
-
-            if (gameState[clickedCellIndex] !== "" || !gameActive) {
-                return;
-            }
-
-            updateCell(clickedCell, clickedCellIndex);
-            checkResult();
+        function setMode(mode, btn) {
+            gameMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            iqContainer.style.display = (mode === 'pvc') ? 'block' : 'none';
+            restartGame();
         }
 
-        function updateCell(cell, index) {
+        function handleCellClick(e) {
+            const index = parseInt(e.target.getAttribute('data-index'));
+            if (gameState[index] !== "" || !gameActive) return;
+            if (gameMode === 'pvc' && currentPlayer === 'O') return;
+
+            makeMove(index);
+
+            if (gameActive && gameMode === 'pvc') {
+                statusText.innerText = "Computer is thinking...";
+                setTimeout(computerMove, 600);
+            }
+        }
+
+        function makeMove(index) {
             gameState[index] = currentPlayer;
-            cell.innerText = currentPlayer;
-            cell.classList.add(currentPlayer.toLowerCase());
-            cell.classList.add('taken');
+            cells[index].innerText = currentPlayer;
+            cells[index].classList.add(currentPlayer.toLowerCase(), 'taken');
+
+            if (checkWinner(gameState, currentPlayer)) {
+                endGame(`Player ${currentPlayer} Wins!`, true);
+            } else if (gameState.every(cell => cell !== "")) {
+                endGame("It's a Draw!", false);
+            } else {
+                currentPlayer = currentPlayer === "X" ? "O" : "X";
+                statusText.innerText = `Player ${currentPlayer}'s Turn`;
+            }
         }
 
-        function changePlayer() {
-            currentPlayer = currentPlayer === "X" ? "O" : "X";
-            statusText.innerText = `Player ${currentPlayer}'s Turn`;
+        function computerMove() {
+            if (!gameActive) return;
+            const iq = parseInt(iqSlider.value);
+            let move;
+
+            if (iq === 0) {
+                // SLUG: Pure Random
+                move = getRandomMove();
+            } else if (iq === 1) {
+                // TODDLER: Win/Block, otherwise random
+                move = getToddlerMove();
+            } else {
+                // NERD: Unbeatable Minimax
+                move = minimax(gameState, "O").index;
+            }
+            makeMove(move);
         }
 
-        function checkResult() {
-            let roundWon = false;
-            let winningLine = [];
+        function getRandomMove() {
+            const avail = gameState.map((v, i) => v === "" ? i : null).filter(v => v !== null);
+            return avail[Math.floor(Math.random() * avail.length)];
+        }
 
-            for (let i = 0; i <= 7; i++) {
-                const winCondition = winningConditions[i];
-                let a = gameState[winCondition[0]];
-                let b = gameState[winCondition[1]];
-                let c = gameState[winCondition[2]];
-                
-                if (a === '' || b === '' || c === '') {
-                    continue;
-                }
-                if (a === b && b === c) {
-                    roundWon = true;
-                    winningLine = winCondition;
-                    break;
+        function getToddlerMove() {
+            // 1. Try to win
+            for(let i=0; i<9; i++) {
+                if(gameState[i] === "") {
+                    gameState[i] = "O";
+                    if(checkWinner(gameState, "O")) { gameState[i] = ""; return i; }
+                    gameState[i] = "";
                 }
             }
+            // 2. Block player
+            for(let i=0; i<9; i++) {
+                if(gameState[i] === "") {
+                    gameState[i] = "X";
+                    if(checkWinner(gameState, "X")) { gameState[i] = ""; return i; }
+                    gameState[i] = "";
+                }
+            }
+            // 3. Just pick random
+            return getRandomMove();
+        }
 
-            if (roundWon) {
-                statusText.innerText = `Player ${currentPlayer} Wins!`;
-                statusText.style.color = currentPlayer === "X" ? "var(--accent-x)" : "var(--accent-o)";
-                gameActive = false;
-                winningLine.forEach(index => cells[index].classList.add('winner-cell'));
-                return;
+        function minimax(tempBoard, player) {
+            const avail = tempBoard.map((v, i) => v === "" ? i : null).filter(v => v !== null);
+            if (checkWinner(tempBoard, "X")) return { score: -10 };
+            if (checkWinner(tempBoard, "O")) return { score: 10 };
+            if (avail.length === 0) return { score: 0 };
+
+            const moves = [];
+            for (let i = 0; i < avail.length; i++) {
+                let move = { index: avail[i] };
+                tempBoard[avail[i]] = player;
+                move.score = minimax(tempBoard, player === "O" ? "X" : "O").score;
+                tempBoard[avail[i]] = "";
+                moves.push(move);
             }
 
-            let roundDraw = !gameState.includes("");
-            if (roundDraw) {
-                statusText.innerText = "Draw!";
-                gameActive = false;
-                return;
+            let bestMove;
+            if (player === "O") {
+                let bestScore = -10000;
+                moves.forEach((m, i) => { if(m.score > bestScore) { bestScore = m.score; bestMove = i; }});
+            } else {
+                let bestScore = 10000;
+                moves.forEach((m, i) => { if(m.score < bestScore) { bestScore = m.score; bestMove = i; }});
             }
+            return moves[bestMove];
+        }
 
-            changePlayer();
+        function checkWinner(board, player) {
+            return winConds.some(cond => cond.every(idx => board[idx] === player));
+        }
+
+        function endGame(msg, hasWinner) {
+            statusText.innerText = msg;
+            gameActive = false;
+            if (hasWinner) {
+                const win = winConds.find(c => c.every(i => gameState[i] === currentPlayer));
+                win.forEach(i => cells[i].classList.add('winner-cell'));
+            }
         }
 
         function restartGame() {
-            gameActive = true;
-            currentPlayer = "X";
+            gameActive = true; currentPlayer = "X";
             gameState = ["", "", "", "", "", "", "", "", ""];
             statusText.innerText = "Player X's Turn";
-            statusText.style.color = "var(--text-color)";
-            cells.forEach(cell => {
-                cell.innerText = "";
-                cell.classList.remove('x', 'o', 'taken', 'winner-cell');
-            });
+            cells.forEach(c => { c.innerText = ""; c.className = 'cell'; });
         }
 
-        cells.forEach(cell => cell.addEventListener('click', handleCellClick));
-        restartBtn.addEventListener('click', restartGame);
+        cells.forEach(c => c.addEventListener('click', handleCellClick));
     </script>
 </body>
 </html>
