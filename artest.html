@@ -1,0 +1,744 @@
+<title>Prøvehæng</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;1,6..72,400;1,6..72,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: én smal kolonne som et arbejdskort fra en rammeværksted — fire trin i rækkefølge, mål i mono */
+:root {
+  --wall: #eceef0;        /* gipsvæg, let kølig */
+  --card: #f9fafb;
+  --ink: #1b1f27;
+  --muted: #5d6470;
+  --line: #d3d7dd;
+  --accent: #2f3fc4;      /* galleri-ultramarin */
+  --accent-ink: #ffffff;
+  --accent-soft: #e3e6fa;
+  --warn: #9a5b00;
+  --display: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --wall: #15171b; --card: #1d2026; --ink: #e8eaee; --muted: #9aa1ad; --line: #343843;
+    --accent: #8c98ff; --accent-ink: #10132b; --accent-soft: #262b4d; --warn: #e5a54b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --wall: #15171b; --card: #1d2026; --ink: #e8eaee; --muted: #9aa1ad; --line: #343843;
+  --accent: #8c98ff; --accent-ink: #10132b; --accent-soft: #262b4d; --warn: #e5a54b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--wall); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+header { display: flex; flex-direction: column; gap: 4px; padding-block: 8px 6px; }
+h1 { font-family: var(--display); font-weight: 500; font-size: 2.6rem; line-height: 1; margin: 0; letter-spacing: -0.01em; }
+h1 em { font-style: italic; color: var(--accent); }
+.lede { margin: 0; color: var(--muted); max-width: 46ch; text-wrap: pretty; }
+section.step { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 18px 16px; display: flex; flex-direction: column; gap: 14px; }
+.step-head { display: flex; align-items: baseline; gap: 10px; }
+.num { font-family: var(--mono); font-size: 0.8rem; color: var(--accent); letter-spacing: 0.06em; }
+h2 { font-family: var(--display); font-weight: 500; font-size: 1.45rem; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.hint { color: var(--muted); font-size: 0.9rem; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; }
+button, .filebtn {
+  font: 500 0.95rem var(--body); border-radius: 4px; padding: 10px 14px; cursor: pointer;
+  border: 1px solid var(--line); background: transparent; color: var(--ink); display: inline-flex; align-items: center; gap: 8px;
+}
+button:focus-visible, .filebtn:focus-within, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.big { width: 100%; justify-content: center; padding: 15px; font-size: 1.05rem; }
+button:disabled { opacity: 0.5; cursor: default; }
+.filebtn input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.filebtn { position: relative; }
+.tag { font-family: var(--mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--warn); }
+
+.editor { position: relative; width: 100%; border-radius: 4px; overflow: hidden; background: var(--wall); touch-action: none; user-select: none; -webkit-user-select: none; }
+#edit { display: block; width: 100%; height: auto; }
+#loupe { position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--card); box-shadow: 0 4px 14px rgba(0,0,0,.4); pointer-events: none; }
+
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+label { display: flex; flex-direction: column; gap: 5px; font-size: 0.82rem; color: var(--muted); }
+.unit { position: relative; }
+.unit input { width: 100%; font: 500 1.1rem var(--mono); padding: 9px 40px 9px 10px; border-radius: 4px; border: 1px solid var(--line); background: var(--wall); color: var(--ink); font-variant-numeric: tabular-nums; }
+.unit span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font: 0.85rem var(--mono); color: var(--muted); pointer-events: none; }
+.sub { font-size: 0.82rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 7px 11px 7px 8px; border-radius: 999px; font-size: 0.88rem; }
+.chip i { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--line); display: inline-block; }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.aspect { font-size: 0.88rem; color: var(--muted); }
+.aspect.off { color: var(--warn); }
+.preview { background: var(--wall); border-radius: 4px; padding: 22px 16px 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+#prev { max-width: 100%; max-height: 300px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.25)); }
+.dims { font: 0.9rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.dims b { color: var(--ink); font-weight: 500; }
+
+ol.tips { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; color: var(--ink); }
+ol.tips li::marker { color: var(--accent); font-family: var(--mono); }
+.note { border-left: 3px solid var(--warn); padding: 8px 12px; font-size: 0.9rem; background: var(--wall); border-radius: 0 4px 4px 0; }
+.note b { font-weight: 600; }
+.rule { font-size: 0.9rem; color: var(--muted); }
+.rule b { color: var(--ink); font-family: var(--mono); font-weight: 500; }
+#status { font-size: 0.9rem; color: var(--muted); min-height: 1.3em; }
+@media (max-width: 380px) { .fields { grid-template-columns: 1fr; } h1 { font-size: 2.2rem; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Prøve<em>hæng</em></h1>
+    <p class="lede">Fotografér et maleri, ret det op, og se det i ægte størrelse på din egen væg med iPhonens AR.</p>
+  </header>
+
+  <section class="step" aria-labelledby="h1s">
+    <div class="step-head"><span class="num">TRIN 1</span><h2 id="h1s">Foto af værket</h2></div>
+    <p class="hint">Fotografér så lige forfra som muligt, i godt dagslys og uden blitz. Skæve vinkler retter du op i næste trin.</p>
+    <div class="row">
+      <label class="filebtn primary"><input id="cam" type="file" accept="image/*" capture="environment">Tag foto</label>
+      <label class="filebtn"><input id="pick" type="file" accept="image/*">Vælg fra billeder</label>
+    </div>
+    <p id="sampleTag" class="tag">Eksempel indlæst – udskift med dit eget foto</p>
+  </section>
+
+  <section class="step" aria-labelledby="h2s">
+    <div class="step-head"><span class="num">TRIN 2</span><h2 id="h2s">Træk hjørnerne ud til værkets kant</h2></div>
+    <div class="editor" id="editor">
+      <canvas id="edit" aria-label="Foto med fire hjørnehåndtag"></canvas>
+      <canvas id="loupe" width="240" height="240" hidden></canvas>
+    </div>
+    <div class="row">
+      <button id="resetCorners" type="button">Nulstil hjørner</button>
+      <button id="fullImage" type="button">Brug hele billedet</button>
+    </div>
+    <p class="hint">Sæt hjørnerne på selve maleriet, ikke på en eventuel ramme. Rammen vælger du i næste trin.</p>
+  </section>
+
+  <section class="step" aria-labelledby="h3s">
+    <div class="step-head"><span class="num">TRIN 3</span><h2 id="h3s">Mål og ramme</h2></div>
+    <div class="fields">
+      <label for="wcm">Bredde på værket
+        <span class="unit"><input id="wcm" type="text" inputmode="decimal" autocomplete="off" min="5" max="500" step="0.5" value="60"><span>cm</span></span>
+      </label>
+      <label for="hcm">Højde på værket
+        <span class="unit"><input id="hcm" type="text" inputmode="decimal" autocomplete="off" min="5" max="500" step="0.5" value="80"><span>cm</span></span>
+      </label>
+    </div>
+    <p id="aspect" class="aspect"></p>
+
+    <div class="sub">Ramme</div>
+    <div class="chips" id="frames" role="group" aria-label="Rammefarve"></div>
+    <div class="fields">
+      <label for="fcm">Rammebredde
+        <span class="unit"><input id="fcm" type="text" inputmode="decimal" autocomplete="off" min="0" max="20" step="0.5" value="3"><span>cm</span></span>
+      </label>
+      <label for="mcm">Passepartout
+        <span class="unit"><input id="mcm" type="text" inputmode="decimal" autocomplete="off" min="0" max="30" step="0.5" value="0"><span>cm</span></span>
+      </label>
+    </div>
+
+    <div class="preview">
+      <canvas id="prev" aria-label="Forhåndsvisning af værket med ramme"></canvas>
+      <div class="dims" id="dims"></div>
+    </div>
+  </section>
+
+  <section class="step" aria-labelledby="h4s">
+    <div class="step-head"><span class="num">TRIN 4</span><h2 id="h4s">Se det på væggen</h2></div>
+    <button id="arBtn" class="primary big" type="button">Se på væggen</button>
+    <div id="status" role="status"></div>
+    <div id="noAr" class="note" hidden><b>AR kræver Safari på iPhone eller iPad.</b> Åbn denne side i Safari for at bruge knappen. Virker den ikke inde i Claude-appen, så åbn linket i Safari i stedet.</div>
+    <ol class="tips">
+      <li>Peg kameraet mod væggen og bevæg telefonen lidt, indtil væggen er fundet.</li>
+      <li>Værket sætter sig fast på væggen i 1:1. Træk med én finger for at flytte det.</li>
+      <li>Tag et skærmbillede med sideknap + lydstyrke op, så du kan sammenligne placeringer.</li>
+    </ol>
+    <p class="rule">Gallerireglen: hæng midten af værket ca. <b>145–150 cm</b> over gulvet. Over en sofa eller et skænk: underkanten <b>20–25 cm</b> over møblet.</p>
+  </section>
+</div>
+
+<script>
+// ---- USDZ-generator (ingen afhængigheder) ----
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+// USDZ = ukomprimeret zip hvor hver fils data starter på en 64-byte grænse.
+function zipStore(files) {
+  const enc = new TextEncoder();
+  const chunks = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name);
+    const size = f.data.length;
+    const crc = crc32(f.data);
+    const start = offset + 30 + name.length;
+    let pad = (64 - (start % 64)) % 64;
+    if (pad > 0 && pad < 4) pad += 64;
+    const hdr = new Uint8Array(30 + name.length + pad);
+    const dv = new DataView(hdr.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(12, 0x21, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, size, true);
+    dv.setUint32(22, size, true);
+    dv.setUint16(26, name.length, true);
+    dv.setUint16(28, pad, true);
+    hdr.set(name, 30);
+    if (pad) {
+      dv.setUint16(30 + name.length, 0x1986, true);
+      dv.setUint16(32 + name.length, pad - 4, true);
+    }
+    central.push({ name, crc, size, offset });
+    chunks.push(hdr, f.data);
+    offset += hdr.length + size;
+  }
+  const cdStart = offset;
+  for (const c of central) {
+    const e = new Uint8Array(46 + c.name.length);
+    const dv = new DataView(e.buffer);
+    dv.setUint32(0, 0x02014b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 20, true);
+    dv.setUint16(14, 0x21, true);
+    dv.setUint32(16, c.crc, true);
+    dv.setUint32(20, c.size, true);
+    dv.setUint32(24, c.size, true);
+    dv.setUint16(28, c.name.length, true);
+    dv.setUint32(42, c.offset, true);
+    e.set(c.name, 46);
+    chunks.push(e);
+    offset += e.length;
+  }
+  const end = new Uint8Array(22);
+  const dv = new DataView(end.buffer);
+  dv.setUint32(0, 0x06054b50, true);
+  dv.setUint16(8, central.length, true);
+  dv.setUint16(10, central.length, true);
+  dv.setUint32(12, offset - cdStart, true);
+  dv.setUint32(16, cdStart, true);
+  chunks.push(end);
+  const out = new Uint8Array(offset + 22);
+  let p = 0;
+  for (const c of chunks) { out.set(c, p); p += c.length; }
+  return out;
+}
+
+function newMesh() { return { pts: [], nrm: [], st: [], counts: [], idx: [] }; }
+function addQuad(m, q, n, uv) {
+  // sørg for mod-uret rækkefølge set fra normalens side
+  const a = q[0], b = q[1], c = q[2];
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+  const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+  const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+  if (cx * n[0] + cy * n[1] + cz * n[2] < 0) { q = q.slice().reverse(); if (uv) uv = uv.slice().reverse(); }
+  const base = m.pts.length;
+  for (let i = 0; i < 4; i++) {
+    m.pts.push(q[i]); m.nrm.push(n);
+    if (uv) m.st.push(uv[i]);
+    m.idx.push(base + i);
+  }
+  m.counts.push(4);
+}
+function addBox(m, x0, x1, y0, y1, z0, z1, skipFront) {
+  if (!skipFront) addQuad(m, [[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]], [0,0,1]);
+  addQuad(m, [[x0,y0,z0],[x1,y0,z0],[x1,y1,z0],[x0,y1,z0]], [0,0,-1]);
+  addQuad(m, [[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[x1,y0,z1]], [1,0,0]);
+  addQuad(m, [[x0,y0,z0],[x0,y1,z0],[x0,y1,z1],[x0,y0,z1]], [-1,0,0]);
+  addQuad(m, [[x0,y1,z0],[x1,y1,z0],[x1,y1,z1],[x0,y1,z1]], [0,1,0]);
+  addQuad(m, [[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1]], [0,-1,0]);
+}
+const f5 = (v) => (Math.abs(v) < 1e-9 ? 0 : +v.toFixed(5));
+const v3 = (a) => a.map((p) => `(${f5(p[0])}, ${f5(p[1])}, ${f5(p[2])})`).join(", ");
+const v2 = (a) => a.map((p) => `(${f5(p[0])}, ${f5(p[1])})`).join(", ");
+
+function meshUsda(name, m, mat) {
+  let mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (const p of m.pts) for (let i = 0; i < 3; i++) { mn[i] = Math.min(mn[i], p[i]); mx[i] = Math.max(mx[i], p[i]); }
+  return `
+            def Mesh "${name}" (
+                prepend apiSchemas = ["MaterialBindingAPI"]
+            )
+            {
+                float3[] extent = [${v3([mn, mx])}]
+                int[] faceVertexCounts = [${m.counts.join(", ")}]
+                int[] faceVertexIndices = [${m.idx.join(", ")}]
+                rel material:binding = </Root/Materials/${mat}>
+                normal3f[] normals = [${v3(m.nrm)}] (
+                    interpolation = "vertex"
+                )
+                point3f[] points = [${v3(m.pts)}]${m.st.length ? `
+                texCoord2f[] primvars:st = [${v2(m.st)}] (
+                    interpolation = "vertex"
+                )` : ""}
+                uniform token subdivisionScheme = "none"
+            }`;
+}
+function srgbToLinear(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function hexLin(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(srgbToLinear);
+}
+function colorMat(name, hex, rough, metal) {
+  const c = hexLin(hex).map((x) => x.toFixed(4)).join(", ");
+  return `
+        def Material "${name}"
+        {
+            token outputs:surface.connect = </Root/Materials/${name}/Shader.outputs:surface>
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (${c})
+                float inputs:roughness = ${rough}
+                float inputs:metallic = ${metal}
+                token outputs:surface
+            }
+        }`;
+}
+
+/**
+ * opts (alle mål i meter): innerW, innerH (værk + passepartout), frameW, frameHex,
+ * frameRough, frameMetal, tex (Uint8Array, jpeg)
+ * Origo = midt på bagsiden; forsiden vender mod +Z (væk fra væggen).
+ */
+function buildUsdz(opts) {
+  const w = opts.innerW / 2, h = opts.innerH / 2, f = opts.frameW;
+  const meshes = [], mats = [];
+  const pic = newMesh();
+  let picZ;
+  if (f > 0) {
+    const depth = 0.032;
+    picZ = depth - 0.007;
+    const fr = newMesh();
+    addBox(fr, -w - f, w + f, h, h + f, 0, depth);      // top
+    addBox(fr, -w - f, w + f, -h - f, -h, 0, depth);    // bund
+    addBox(fr, -w - f, -w, -h, h, 0, depth);            // venstre
+    addBox(fr, w, w + f, -h, h, 0, depth);              // højre
+    meshes.push(meshUsda("Ramme", fr, "MatRamme"));
+    mats.push(colorMat("MatRamme", opts.frameHex, opts.frameRough, opts.frameMetal));
+    const back = newMesh();
+    addBox(back, -w, w, -h, h, 0, picZ - 0.001, true);
+    meshes.push(meshUsda("Bagplade", back, "MatKant"));
+  } else {
+    picZ = 0.022;
+    const edge = newMesh();
+    addBox(edge, -w, w, -h, h, 0, picZ, true);
+    meshes.push(meshUsda("Kant", edge, "MatKant"));
+  }
+  mats.push(colorMat("MatKant", "#d9d6cf", 0.9, 0));
+  addQuad(pic, [[-w,-h,picZ],[w,-h,picZ],[w,h,picZ],[-w,h,picZ]], [0,0,1], [[0,0],[1,0],[1,1],[0,1]]);
+  meshes.push(meshUsda("Billede", pic, "MatBillede"));
+  mats.push(`
+        def Material "MatBillede"
+        {
+            token outputs:surface.connect = </Root/Materials/MatBillede/Shader.outputs:surface>
+            def Shader "Shader"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor.connect = </Root/Materials/MatBillede/Tex.outputs:rgb>
+                float inputs:roughness = 0.88
+                float inputs:metallic = 0
+                token outputs:surface
+            }
+            def Shader "Tex"
+            {
+                uniform token info:id = "UsdUVTexture"
+                asset inputs:file = @textures/billede.jpg@
+                float2 inputs:st.connect = </Root/Materials/MatBillede/St.outputs:result>
+                token inputs:sourceColorSpace = "sRGB"
+                token inputs:wrapS = "clamp"
+                token inputs:wrapT = "clamp"
+                float3 outputs:rgb
+            }
+            def Shader "St"
+            {
+                uniform token info:id = "UsdPrimvarReader_float2"
+                string inputs:varname = "st"
+                float2 outputs:result
+            }
+        }`);
+  const usda = `#usda 1.0
+(
+    customLayerData = {
+        string creator = "Proevehaeng"
+    }
+    defaultPrim = "Root"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Root" (
+    prepend apiSchemas = ["Preliminary_AnchoringAPI"]
+)
+{
+    uniform token preliminary:anchoring:type = "plane"
+    uniform token preliminary:planeAnchoring:alignment = "vertical"
+
+    def Xform "Scene"
+    {
+${meshes.join("\n")}
+    }
+
+    def Scope "Materials"
+    {${mats.join("\n")}
+    }
+}
+`;
+  return zipStore([
+    { name: "model.usda", data: new TextEncoder().encode(usda) },
+    { name: "textures/billede.jpg", data: opts.tex },
+  ]);
+}
+
+
+(() => {
+  const FRAMES = [
+    { id: "none", name: "Ingen", hex: null },
+    { id: "black", name: "Sort", hex: "#1d1c1b", r: 0.55, m: 0 },
+    { id: "white", name: "Hvid", hex: "#eeede8", r: 0.6, m: 0 },
+    { id: "oak", name: "Eg", hex: "#b88d5e", r: 0.75, m: 0 },
+    { id: "walnut", name: "Valnød", hex: "#5b3f2c", r: 0.7, m: 0 },
+    { id: "gold", name: "Guld", hex: "#b8963f", r: 0.35, m: 0.7 },
+  ];
+  const MAT_COLOR = "#f5f4ef";
+  const $ = (id) => document.getElementById(id);
+  const state = { img: null, corners: null, initCorners: null, frame: "black" };
+
+  // ---------- homografi ----------
+  function squareToQuad(q) {
+    const [x0, y0] = q[0], [x1, y1] = q[1], [x2, y2] = q[2], [x3, y3] = q[3];
+    const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+    const dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+    let a, b, c, d, e, f, g, h;
+    if (Math.abs(dx3) < 1e-9 && Math.abs(dy3) < 1e-9) {
+      a = x1 - x0; b = x3 - x0; c = x0; d = y1 - y0; e = y3 - y0; f = y0; g = 0; h = 0;
+    } else {
+      const det = dx1 * dy2 - dx2 * dy1;
+      g = (dx3 * dy2 - dx2 * dy3) / det;
+      h = (dx1 * dy3 - dx3 * dy1) / det;
+      a = x1 - x0 + g * x1; b = x3 - x0 + h * x3; c = x0;
+      d = y1 - y0 + g * y1; e = y3 - y0 + h * y3; f = y0;
+    }
+    return [a, b, c, d, e, f, g, h, 1];
+  }
+  function inv3(m) {
+    const [a, b, c, d, e, f, g, h, i] = m;
+    const A = e * i - f * h, B = -(d * i - f * g), C = d * h - e * g;
+    const det = a * A + b * B + c * C;
+    return [A / det, -(b * i - c * h) / det, (b * f - c * e) / det,
+            B / det, (a * i - c * g) / det, -(a * f - c * d) / det,
+            C / det, -(a * h - b * g) / det, (a * e - b * d) / det];
+  }
+
+  // Ret det markerede område op til et rektangel (bilineær sampling)
+  function rectify(srcData, sw, sh, quad, W, H) {
+    const m = squareToQuad(quad);
+    const out = new ImageData(W, H);
+    const s = srcData, o = out.data;
+    for (let j = 0; j < H; j++) {
+      const v = (j + 0.5) / H;
+      for (let i = 0; i < W; i++) {
+        const u = (i + 0.5) / W;
+        const z = m[6] * u + m[7] * v + 1;
+        let x = (m[0] * u + m[1] * v + m[2]) / z - 0.5;
+        let y = (m[3] * u + m[4] * v + m[5]) / z - 0.5;
+        if (x < 0) x = 0; if (y < 0) y = 0;
+        if (x > sw - 1.001) x = sw - 1.001; if (y > sh - 1.001) y = sh - 1.001;
+        const xi = x | 0, yi = y | 0, fx = x - xi, fy = y - yi;
+        const p = (yi * sw + xi) * 4, p2 = p + sw * 4, k = (j * W + i) * 4;
+        for (let ch = 0; ch < 3; ch++) {
+          const t = s[p + ch] + (s[p + 4 + ch] - s[p + ch]) * fx;
+          const btm = s[p2 + ch] + (s[p2 + 4 + ch] - s[p2 + ch]) * fx;
+          o[k + ch] = t + (btm - t) * fy;
+        }
+        o[k + 3] = 255;
+      }
+    }
+    return out;
+  }
+
+  // ---------- eksempelbillede: et maleri fotograferet lidt skævt på en væg ----------
+  function makeSample() {
+    const pw = 600, ph = 800;
+    const art = document.createElement("canvas"); art.width = pw; art.height = ph;
+    const a = art.getContext("2d");
+    a.fillStyle = "#e9dcc2"; a.fillRect(0, 0, pw, ph);
+    a.fillStyle = "#24405e"; a.fillRect(0, 470, pw, 330);
+    a.fillStyle = "#c4542f"; a.beginPath(); a.arc(390, 300, 150, 0, Math.PI * 2); a.fill();
+    a.fillStyle = "#e3b23c"; a.fillRect(70, 120, 150, 260);
+    a.strokeStyle = "#1c1b1a"; a.lineWidth = 14; a.beginPath(); a.moveTo(40, 610); a.bezierCurveTo(200, 520, 380, 700, 560, 590); a.stroke();
+    a.fillStyle = "#6f8f6a"; a.fillRect(420, 640, 120, 110);
+    const W = 900, H = 1200;
+    const ph2 = document.createElement("canvas"); ph2.width = W; ph2.height = H;
+    const c = ph2.getContext("2d");
+    const g = c.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#d8d6cf"); g.addColorStop(1, "#b9b6ae");
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.fillStyle = "#8f8a80"; c.fillRect(0, 1060, W, 140);
+    const quad = [[205, 190], [700, 245], [690, 905], [215, 985]];
+    const wall = c.getImageData(0, 0, W, H);
+    const artD = a.getImageData(0, 0, pw, ph).data;
+    const mi = inv3(squareToQuad(quad));
+    for (let y = 150; y < 1010; y++) for (let x = 180; x < 730; x++) {
+      const z = mi[6] * x + mi[7] * y + mi[8];
+      const u = (mi[0] * x + mi[1] * y + mi[2]) / z, v = (mi[3] * x + mi[4] * y + mi[5]) / z;
+      if (u < 0 || u >= 1 || v < 0 || v >= 1) continue;
+      const sp = ((v * ph | 0) * pw + (u * pw | 0)) * 4, dp = (y * W + x) * 4;
+      const shade = 0.92 + 0.08 * u;
+      for (let ch = 0; ch < 3; ch++) wall.data[dp + ch] = artD[sp + ch] * shade;
+    }
+    c.putImageData(wall, 0, 0);
+    return { canvas: ph2, quad };
+  }
+
+  // ---------- kilde-billede ----------
+  let srcCanvas = null, srcData = null;
+  function setSource(canvas, corners) {
+    srcCanvas = canvas;
+    srcData = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+    state.corners = corners.map((p) => p.slice());
+    state.initCorners = corners.map((p) => p.slice());
+    layoutEditor(); drawEditor(); scheduleRectify();
+  }
+  function loadFile(file) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const max = 2600, sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(img.naturalWidth * sc); cv.height = Math.round(img.naturalHeight * sc);
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      const w = cv.width, h = cv.height, ix = w * 0.12, iy = h * 0.12;
+      $("sampleTag").hidden = true;
+      setSource(cv, [[ix, iy], [w - ix, iy], [w - ix, h - iy], [ix, h - iy]]);
+      $("editor").scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); setStatus("Billedet kunne ikke åbnes. Prøv et JPEG- eller PNG-billede."); };
+    img.src = url;
+  }
+  $("cam").addEventListener("change", (e) => loadFile(e.target.files[0]));
+  $("pick").addEventListener("change", (e) => loadFile(e.target.files[0]));
+
+  // ---------- hjørne-editor ----------
+  const edit = $("edit"), ectx = edit.getContext("2d"), loupe = $("loupe"), lctx = loupe.getContext("2d");
+  let scale = 1, dpr = 1, drag = -1;
+  function layoutEditor() {
+    if (!srcCanvas) return;
+    dpr = window.devicePixelRatio || 1;
+    const cssW = edit.parentElement.clientWidth || 360;
+    const maxH = Math.min(window.innerHeight * 0.7, 620);
+    let w = cssW, h = cssW * srcCanvas.height / srcCanvas.width;
+    if (h > maxH) { h = maxH; w = h * srcCanvas.width / srcCanvas.height; }
+    edit.style.width = w + "px"; edit.style.height = h + "px"; edit.style.margin = "0 auto";
+    edit.width = Math.round(w * dpr); edit.height = Math.round(h * dpr);
+    scale = w / srcCanvas.width;
+  }
+  function accent() { return getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#2f3fc4"; }
+  function drawEditor() {
+    if (!srcCanvas) return;
+    const k = scale * dpr;
+    ectx.setTransform(1, 0, 0, 1, 0, 0);
+    ectx.drawImage(srcCanvas, 0, 0, edit.width, edit.height);
+    const q = state.corners.map(([x, y]) => [x * k, y * k]);
+    ectx.save();
+    ectx.beginPath(); ectx.rect(0, 0, edit.width, edit.height);
+    ectx.moveTo(q[0][0], q[0][1]); for (let i = 1; i < 4; i++) ectx.lineTo(q[i][0], q[i][1]); ectx.closePath();
+    ectx.fillStyle = "rgba(10,12,20,0.5)"; ectx.fill("evenodd");
+    ectx.beginPath(); ectx.moveTo(q[0][0], q[0][1]); for (let i = 1; i < 4; i++) ectx.lineTo(q[i][0], q[i][1]); ectx.closePath();
+    ectx.strokeStyle = "#fff"; ectx.lineWidth = 2 * dpr; ectx.stroke();
+    const ac = accent();
+    q.forEach(([x, y], i) => {
+      ectx.beginPath(); ectx.arc(x, y, (drag === i ? 13 : 10) * dpr, 0, Math.PI * 2);
+      ectx.fillStyle = "rgba(255,255,255,0.25)"; ectx.fill();
+      ectx.lineWidth = 3 * dpr; ectx.strokeStyle = "#fff"; ectx.stroke();
+      ectx.beginPath(); ectx.arc(x, y, 3 * dpr, 0, Math.PI * 2); ectx.fillStyle = ac; ectx.fill();
+    });
+    ectx.restore();
+  }
+  function pos(e) {
+    const r = edit.getBoundingClientRect();
+    return [(e.clientX - r.left) / scale, (e.clientY - r.top) / scale, e.clientX - r.left, e.clientY - r.top];
+  }
+  function drawLoupe(ix, iy, cx, cy) {
+    const z = 3, size = 240, srcSize = 120 / (z * scale);
+    lctx.fillStyle = "#000"; lctx.fillRect(0, 0, size, size);
+    lctx.imageSmoothingEnabled = true;
+    lctx.drawImage(srcCanvas, ix - srcSize / 2, iy - srcSize / 2, srcSize, srcSize, 0, 0, size, size);
+    lctx.strokeStyle = "#fff"; lctx.lineWidth = 2;
+    lctx.beginPath(); lctx.moveTo(size / 2, size / 2 - 28); lctx.lineTo(size / 2, size / 2 + 28);
+    lctx.moveTo(size / 2 - 28, size / 2); lctx.lineTo(size / 2 + 28, size / 2); lctx.stroke();
+    const ew = edit.clientWidth;
+    let lx = cx - 60, ly = cy - 150;
+    if (ly < 4) ly = cy + 30;
+    lx = Math.max(4, Math.min(ew - 124, lx));
+    loupe.style.left = (lx + edit.offsetLeft) + "px"; loupe.style.top = ly + "px";
+    loupe.hidden = false;
+  }
+  edit.addEventListener("pointerdown", (e) => {
+    if (!srcCanvas) return;
+    const [x, y] = pos(e);
+    let best = -1, bd = (34 / scale) ** 2;
+    state.corners.forEach(([cx, cy], i) => { const d = (cx - x) ** 2 + (cy - y) ** 2; if (d < bd) { bd = d; best = i; } });
+    if (best < 0) return;
+    drag = best; edit.setPointerCapture(e.pointerId);
+    drawEditor(); const [ix, iy, cx, cy] = pos(e); drawLoupe(state.corners[best][0], state.corners[best][1], cx, cy);
+    e.preventDefault();
+  });
+  edit.addEventListener("pointermove", (e) => {
+    if (drag < 0) return;
+    let [x, y, cx, cy] = pos(e);
+    x = Math.max(0, Math.min(srcCanvas.width, x)); y = Math.max(0, Math.min(srcCanvas.height, y));
+    state.corners[drag] = [x, y];
+    drawEditor(); drawLoupe(x, y, cx, cy);
+  });
+  const endDrag = () => { if (drag < 0) return; drag = -1; loupe.hidden = true; drawEditor(); scheduleRectify(); };
+  edit.addEventListener("pointerup", endDrag);
+  edit.addEventListener("pointercancel", endDrag);
+  $("resetCorners").onclick = () => { state.corners = state.initCorners.map((p) => p.slice()); drawEditor(); scheduleRectify(); };
+  $("fullImage").onclick = () => {
+    const w = srcCanvas.width, h = srcCanvas.height;
+    state.corners = [[0, 0], [w, 0], [w, h], [0, h]]; drawEditor(); scheduleRectify();
+  };
+  let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { layoutEditor(); drawEditor(); }, 120); });
+
+  // ---------- mål og ramme ----------
+  const fr = $("frames");
+  FRAMES.forEach((f) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.dataset.id = f.id;
+    b.setAttribute("aria-pressed", f.id === state.frame);
+    const dot = document.createElement("i");
+    dot.style.background = f.hex || "transparent";
+    if (!f.hex) dot.style.borderStyle = "dashed";
+    b.append(dot, document.createTextNode(f.name));
+    b.onclick = () => {
+      state.frame = f.id;
+      fr.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", c.dataset.id === f.id));
+      renderPreview();
+    };
+    fr.append(b);
+  });
+  const num = (id, def) => { const v = parseFloat(String($(id).value).replace(",", ".")); return isFinite(v) && v >= 0 ? v : def; };
+  function dims() {
+    const w = Math.max(5, num("wcm", 60)), h = Math.max(5, num("hcm", 80));
+    const frame = FRAMES.find((f) => f.id === state.frame);
+    const fw = frame.hex ? num("fcm", 3) : 0, m = num("mcm", 0);
+    return { w, h, m, fw, frame };
+  }
+  ["wcm", "hcm"].forEach((id) => $(id).addEventListener("input", scheduleRectify));
+  ["fcm", "mcm"].forEach((id) => $(id).addEventListener("input", renderPreview));
+
+  function photoAspect() {
+    const q = state.corners, L = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+    return ((L(q[0], q[1]) + L(q[3], q[2])) / 2) / ((L(q[0], q[3]) + L(q[1], q[2])) / 2);
+  }
+  const fmt = (v) => (Math.round(v * 10) / 10).toLocaleString("da-DK");
+
+  let rectCanvas = document.createElement("canvas"), rt;
+  function scheduleRectify() { clearTimeout(rt); rt = setTimeout(doRectify, 60); }
+  function doRectify() {
+    if (!srcCanvas) return;
+    const { w, h } = dims();
+    const max = 1600;
+    const W = w >= h ? max : Math.round(max * w / h), H = w >= h ? Math.round(max * h / w) : max;
+    rectCanvas.width = W; rectCanvas.height = H;
+    rectCanvas.getContext("2d").putImageData(rectify(srcData, srcCanvas.width, srcCanvas.height, state.corners, W, H), 0, 0);
+    const pa = photoAspect(), ea = w / h, off = Math.abs(Math.log(pa / ea)) > 0.12;
+    const el = $("aspect");
+    el.className = "aspect" + (off ? " off" : "");
+    el.textContent = off
+      ? `Fotoet ser ud til at være ca. ${fmt(pa * h)} × ${fmt(h)} cm i forholdet. Tjek målene, ellers bliver værket strakt.`
+      : "Målene passer med fotoets proportioner.";
+    renderPreview();
+  }
+
+  // Tegn værk + passepartout (+ ramme til forhåndsvisning)
+  function compose(pxPerCm, withFrame) {
+    const { w, h, m, fw, frame } = dims();
+    const f = withFrame ? fw : 0;
+    const cw = Math.round((w + 2 * m + 2 * f) * pxPerCm), ch = Math.round((h + 2 * m + 2 * f) * pxPerCm);
+    const c = document.createElement("canvas"); c.width = cw; c.height = ch;
+    const x = c.getContext("2d");
+    if (f > 0) {
+      x.fillStyle = frame.hex; x.fillRect(0, 0, cw, ch);
+      x.fillStyle = "rgba(0,0,0,0.18)"; x.fillRect(f * pxPerCm - 2, f * pxPerCm - 2, cw - 2 * f * pxPerCm + 4, ch - 2 * f * pxPerCm + 4);
+    }
+    x.fillStyle = MAT_COLOR;
+    x.fillRect(f * pxPerCm, f * pxPerCm, (w + 2 * m) * pxPerCm, (h + 2 * m) * pxPerCm);
+    x.drawImage(rectCanvas, (f + m) * pxPerCm, (f + m) * pxPerCm, w * pxPerCm, h * pxPerCm);
+    return c;
+  }
+  function renderPreview() {
+    if (!rectCanvas.width) return;
+    const { w, h, m, fw } = dims();
+    const tot = Math.max(w + 2 * m + 2 * fw, h + 2 * m + 2 * fw);
+    const ppc = 600 / tot;
+    const c = compose(ppc, true), prev = $("prev");
+    prev.width = c.width; prev.height = c.height;
+    prev.getContext("2d").drawImage(c, 0, 0);
+    const ow = w + 2 * m + 2 * fw, oh = h + 2 * m + 2 * fw;
+    $("dims").innerHTML = `Værk ${fmt(w)} × ${fmt(h)} cm · udvendigt <b>${fmt(ow)} × ${fmt(oh)} cm</b>`;
+  }
+
+  // ---------- AR ----------
+  const supportsAR = (() => { try { return document.createElement("a").relList.supports("ar"); } catch (e) { return false; } })();
+  if (!supportsAR) $("noAr").hidden = false;
+  function setStatus(t) { $("status").textContent = t; }
+  let lastUrl = null;
+  $("arBtn").onclick = async () => {
+    if (!rectCanvas.width) return;
+    const btn = $("arBtn");
+    btn.disabled = true; setStatus("Bygger 3D-model …");
+    try {
+      const { w, h, m, fw, frame } = dims();
+      const innerW = w + 2 * m, innerH = h + 2 * m;
+      const ppc = 2048 / Math.max(innerW, innerH);
+      const tex = compose(ppc, false);
+      const blob = await new Promise((r) => tex.toBlob(r, "image/jpeg", 0.9));
+      const texBytes = new Uint8Array(await blob.arrayBuffer());
+      const usdz = buildUsdz({
+        innerW: innerW / 100, innerH: innerH / 100, frameW: fw / 100,
+        frameHex: frame.hex || "#000000", frameRough: frame.r || 0.6, frameMetal: frame.m || 0, tex: texBytes,
+      });
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = URL.createObjectURL(new Blob([usdz], { type: "model/vnd.usdz+zip" }));
+      const a = document.createElement("a");
+      a.setAttribute("rel", "ar");
+      a.href = lastUrl + "#allowsContentScaling=0";
+      a.appendChild(document.createElement("img"));
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => a.remove(), 1000);
+      setStatus(supportsAR
+        ? `Åbner AR · ${(usdz.length / 1e6).toFixed(1).replace(".", ",")} MB. Sker der ikke noget, så åbn siden i Safari.`
+        : "Modellen er klar, men denne browser kan ikke vise AR. Åbn siden i Safari på iPhone.");
+    } catch (err) {
+      setStatus("Modellen kunne ikke bygges: " + (err && err.message ? err.message : err));
+    } finally { btn.disabled = false; }
+  };
+
+  // ---------- start med eksempel ----------
+  const s = makeSample();
+  setSource(s.canvas, s.quad);
+})();
+</script>
